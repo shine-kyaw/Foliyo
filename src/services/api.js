@@ -1,10 +1,14 @@
 /**
  * Internal API client — calls our backend server at /api/*.
- * Never exposes API keys; all external API calls happen server-side.
+ * In production (Vercel) VITE_API_URL points to the Render API server.
+ * In dev the Vite proxy forwards /api/* to localhost:3001.
  */
 
+// e.g. "https://foliyo-api.onrender.com" — no trailing slash
+const API_BASE = import.meta.env.VITE_API_URL || ''
+
 async function apiFetch(path, params = {}) {
-  const url = new URL(`/api${path}`, window.location.origin)
+  const url = new URL(`${API_BASE}/api${path}`, API_BASE || window.location.origin)
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v)
   })
