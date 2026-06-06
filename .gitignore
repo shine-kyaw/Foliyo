@@ -3,6 +3,9 @@
 .agents/
 skills-lock.json
 
+# Other projects nested in this directory
+Vibe Coding/
+
 # dependencies
 node_modules/
 
