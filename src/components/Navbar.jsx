@@ -172,8 +172,10 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-15 py-3 gap-3">
 
-          {/* Logo — zoomed into the icon portion */}
-          <Link to="/" className="flex items-center shrink-0 group">
+          {/* Logo — zoomed into the icon portion, click = home + refresh */}
+          <Link to="/"
+            onClick={() => window.dispatchEvent(new CustomEvent('foliyo:refresh'))}
+            className="flex items-center shrink-0 group">
             <div style={{
               width: 38, height: 38, borderRadius: 10, flexShrink: 0,
               backgroundImage: 'url(/logo.jpg)',
