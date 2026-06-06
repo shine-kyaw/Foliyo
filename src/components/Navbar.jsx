@@ -1,9 +1,9 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { NavLink, Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   BarChart2, Briefcase, Bell, Newspaper, Home, Menu, X,
-  BookMarked, User, LogIn, GitCompare, Cpu, Globe2, ChevronDown,
+  BookMarked, User, LogIn, GitCompare, Cpu, Globe2, ChevronDown, RefreshCw,
 } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { useIndices } from '../hooks/useIndices'
@@ -103,6 +103,27 @@ function GlobalMarketsNav() {
   )
 }
 
+/* ── Refresh button — broadcasts a global event all quote hooks listen to ── */
+function RefreshButton() {
+  const [spinning, setSpinning] = useState(false)
+  const fire = useCallback(() => {
+    if (spinning) return
+    setSpinning(true)
+    window.dispatchEvent(new CustomEvent('foliyo:refresh'))
+    setTimeout(() => setSpinning(false), 1200)
+  }, [spinning])
+  return (
+    <motion.button
+      whileTap={{ scale: 0.9 }}
+      onClick={fire}
+      className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+      style={{ color:'var(--text-2)', border:'1px solid var(--border)', background:'var(--bg-1)' }}
+    >
+      <RefreshCw size={13} className={spinning ? 'animate-spin' : ''} />
+    </motion.button>
+  )
+}
+
 /* ── Main Navbar ─────────────────────────────────────────────── */
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -151,13 +172,15 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-15 py-3 gap-3">
 
-          {/* Logo */}
+          {/* Logo — zoomed into the icon portion */}
           <Link to="/" className="flex items-center shrink-0 group">
-            <img
-              src="/logo.jpg"
-              alt="Foliyo"
-              className="h-9 w-auto object-contain rounded-lg"
-            />
+            <div style={{
+              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+              backgroundImage: 'url(/logo.jpg)',
+              backgroundSize: '280%',
+              backgroundPosition: 'center 28%',
+              backgroundRepeat: 'no-repeat',
+            }} aria-label="Foliyo" />
           </Link>
 
           {/* Desktop Nav — icon-only with tooltips */}
@@ -188,6 +211,9 @@ export default function Navbar() {
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"/>
               Live
             </div>
+            <Tip label="Refresh prices">
+              <RefreshButton />
+            </Tip>
             <motion.button whileTap={{ scale:0.95 }} onClick={openAccount}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
               style={user

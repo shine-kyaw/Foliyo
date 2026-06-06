@@ -72,7 +72,11 @@ export function useBatchQuotes(symbols, pollMs = 60_000) {
     let id
     if (pollMs > 0) id = setInterval(() => doLoad(ctrl.signal), pollMs)
 
-    return () => { ctrl.abort(); clearInterval(id) }
+    // Listen for manual refresh trigger from the navbar button
+    const onRefresh = () => doLoad(ctrl.signal)
+    window.addEventListener('foliyo:refresh', onRefresh)
+
+    return () => { ctrl.abort(); clearInterval(id); window.removeEventListener('foliyo:refresh', onRefresh) }
   }, [symbolsKey, pollMs, doLoad])
 
   return { quotes, loading, lastUpdated, refetch: () => doLoad(new AbortController().signal) }

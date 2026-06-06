@@ -53,7 +53,9 @@ export function useQuote(symbol) {
     if (!lsRead(key)) { setQuote(null); setStatus('loading') }
     load()
     const id = setInterval(load, REFRESH_MS)
-    return () => clearInterval(id)
+    // Listen for manual refresh trigger from the navbar button
+    window.addEventListener('foliyo:refresh', load)
+    return () => { clearInterval(id); window.removeEventListener('foliyo:refresh', load) }
   }, [key, load])
 
   return { quote, status, lastUpdated, refetch: load }
