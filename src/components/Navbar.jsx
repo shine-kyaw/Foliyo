@@ -152,18 +152,12 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-15 py-3 gap-3">
 
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 group shrink-0">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center shadow-lg"
-              style={{ background:'var(--accent)', boxShadow:`0 4px 14px rgba(var(--accent-rgb),.4)` }}>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M2 12 L6 4 L10 9 L13 6 L14 8" stroke="rgba(0,0,0,0.9)" strokeWidth="2.2"
-                  strokeLinecap="round" strokeLinejoin="round"/>
-                <circle cx="13.5" cy="5.5" r="1.8" fill="rgba(0,0,0,0.9)"/>
-              </svg>
-            </div>
-            <span className="text-lg font-black tracking-tight" style={{ color:'var(--text-1)' }}>
-              Foli<span style={{ color:'var(--accent)' }}>yo</span>
-            </span>
+          <Link to="/" className="flex items-center shrink-0 group">
+            <img
+              src="/logo.jpg"
+              alt="Foliyo"
+              className="h-9 w-auto object-contain rounded-lg"
+            />
           </Link>
 
           {/* Desktop Nav — icon-only with tooltips */}
