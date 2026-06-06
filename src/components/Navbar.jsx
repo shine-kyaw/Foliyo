@@ -172,17 +172,15 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-15 py-3 gap-3">
 
-          {/* Logo — zoomed into the icon portion, click = home + refresh */}
+          {/* Logo — SVG icon + wordmark, click = home + refresh */}
           <Link to="/"
             onClick={() => window.dispatchEvent(new CustomEvent('foliyo:refresh'))}
-            className="flex items-center shrink-0 group">
-            <div style={{
-              width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-              backgroundImage: 'url(/logo.jpg)',
-              backgroundSize: '280%',
-              backgroundPosition: 'center 28%',
-              backgroundRepeat: 'no-repeat',
-            }} aria-label="Foliyo" />
+            className="flex items-center gap-2 shrink-0 group">
+            <img src="/logo-icon.svg" alt="" width={34} height={34} className="rounded-lg" />
+            <span className="text-[15px] font-black tracking-tight hidden sm:inline"
+              style={{ color: 'var(--text-1)' }}>
+              Foli<span style={{ color: 'var(--accent)' }}>yo</span>
+            </span>
           </Link>
 
           {/* Desktop Nav — icon-only with tooltips */}

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
+  <rect width="40" height="40" rx="10" fill="#05070e"/>
+  <!-- Three ascending bars matching the logo staircase -->
+  <rect x="7"  y="24" width="7" height="9"  rx="2.5" fill="#06b6d4" opacity="0.45"/>
+  <rect x="17" y="17" width="7" height="16" rx="2.5" fill="#06b6d4" opacity="0.72"/>
+  <rect x="27" y="9"  width="7" height="24" rx="2.5" fill="#06b6d4"/>
+</svg>
