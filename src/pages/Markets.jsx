@@ -1,11 +1,14 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Search, TrendingUp, TrendingDown, BarChart2, Filter, Flame, Activity, Wifi } from 'lucide-react'
-import { stocks as baseStocks, indices, sectorPerformance } from '../data/mockData'
+import { Search, TrendingUp, TrendingDown, Filter, Activity } from 'lucide-react'
+import { stocks as baseStocks, sectorPerformance } from '../data/mockData'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
+import { useLiveIndices } from '../hooks/useLiveIndices'
 import { fmtPrice, fmtPct, fmtChange, changeColor } from '../utils/formatLive'
+import { usSession } from '../utils/marketHours'
+import PageHeader, { StatusPill } from '../components/PageHeader'
 
 const SECTORS = ['All','Technology','Healthcare','Financials','Cons. Disc.','Communication','Energy']
 
@@ -18,6 +21,7 @@ export default function Markets() {
   const symbols = useMemo(() => baseStocks.map(s => s.symbol), [])
   const { quotes, lastUpdated } = useBatchQuotes(symbols, 60_000)
   const isLive = Object.keys(quotes).length > 0
+  const session = usSession()
 
   /* Overlay live prices — null out mock values so we never show stale numbers */
   const stocks = useMemo(() => baseStocks.map(s => {
@@ -38,44 +42,37 @@ export default function Markets() {
       sortBy === 'price'     ? (b.price ?? -Infinity) - (a.price ?? -Infinity) : 0
     )
 
-  /* Only rank stocks with live data so we never show "Top Gainers" with mock pcts */
+  /* Only rank stocks with live data so we never show "Top gainers" with mock pcts */
   const ranked = stocks.filter(s => s.changePct != null)
   const gainers = [...ranked].sort((a,b) => b.changePct - a.changePct).slice(0,5)
   const losers  = [...ranked].sort((a,b) => a.changePct - b.changePct).slice(0,5)
   const mostActive = [...ranked].sort((a,b) => Math.abs(b.changePct) - Math.abs(a.changePct)).slice(0,4)
 
+  /* Live index proxies (SPY/QQQ/DIA); names with a dash until they load */
+  const { indices: liveIndices, isLive: indicesLive } = useLiveIndices(60_000)
+  const indexCards = indicesLive
+    ? liveIndices.map(i => ({
+        name: i.name,
+        value: i.price.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }),
+        change: `${i.changePct >= 0 ? '+' : ''}${i.changePct.toFixed(2)}%`,
+        up: i.changePct >= 0,
+      }))
+    : ['S&P 500', 'NASDAQ', 'Dow Jones'].map(name => ({ name, value:'—', change:'', up:true }))
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6 page-enter">
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-black flex items-center gap-2.5" style={{ color:'var(--text-1)' }}>
-            <BarChart2 size={21} style={{ color:'var(--accent)' }}/>
-            Markets
-          </h1>
-          <p className="text-sm mt-0.5" style={{ color:'var(--text-3)' }}>
-            Global equities across US, EU, and Asia Pacific
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {isLive && (
-            <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full"
-              style={{ color:'var(--accent)', background:'rgba(var(--accent-rgb),.08)', border:'1px solid rgba(var(--accent-rgb),.18)' }}>
-              <Wifi size={11}/> Live · Finnhub
-            </div>
-          )}
-          <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full"
-            style={{ color:'#10b981', background:'rgba(16,185,129,.08)', border:'1px solid rgba(16,185,129,.18)' }}>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"/>
-            Market Open
-          </div>
-        </div>
-      </div>
+      <PageHeader title="Markets" subtitle="Equities across the US, Europe and Asia Pacific, ranked by today's move.">
+        {isLive && <StatusPill tone="accent">Live · Finnhub</StatusPill>}
+        <StatusPill tone={session.open ? 'live' : 'muted'} pulse={session.open}>{session.label}</StatusPill>
+      </PageHeader>
 
       {/* ── Index cards ── */}
-      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-        {indices.slice(0,6).map((idx, i) => (
+      <div>
+      <div className="section-label mb-2.5">Indices</div>
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
+        {indexCards.map((idx, i) => (
           <motion.div
             key={idx.name}
             initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
@@ -86,31 +83,34 @@ export default function Markets() {
             <div className="font-black font-mono text-base tracking-tight" style={{ color:'var(--text-1)' }}>
               {idx.value}
             </div>
-            <div className={`text-xs font-bold mt-0.5 ${idx.up ? 'text-emerald-400' : 'text-red-400'}`}>
-              {idx.change}
+            <div className={`text-xs font-bold font-mono mt-0.5 ${idx.change ? (idx.up ? 'text-emerald-400' : 'text-red-400') : ''}`}
+              style={idx.change ? undefined : { color:'var(--text-3)' }}>
+              {idx.change || 'Waiting for prices'}
             </div>
           </motion.div>
         ))}
+      </div>
       </div>
 
       {/* ── Movers + Sector ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Gainers */}
-        <div className="card-flat rounded-2xl overflow-hidden border" style={{ borderColor:'var(--border)', padding:0 }}>
+        <div className="card-flat overflow-hidden" style={{ padding:0 }}>
           <div className="px-4 py-3 border-b flex items-center gap-2"
             style={{ borderColor:'var(--border)', background:'var(--bg-2)' }}>
             <TrendingUp size={14} className="text-emerald-400"/>
-            <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Top Gainers</span>
+            <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Top gainers</span>
           </div>
           <div style={{ background:'var(--bg-1)' }}>
+            {!gainers.length && <p className="px-4 py-8 text-sm text-center" style={{ color:'var(--text-3)' }}>No live prices yet. Gainers appear once quotes load.</p>}
             {gainers.map((s, i) => (
               <Link key={s.symbol} to={`/stock/${s.symbol}`}
-                className="flex items-center justify-between px-4 py-2.5 border-b transition-colors hover:bg-emerald-400/5 group"
+                className="flex items-center justify-between px-4 py-2.5 border-b transition-colors hover:bg-emerald-400/5 group last:border-b-0"
                 style={{ borderColor:'var(--border)' }}>
                 <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0"
-                    style={{ background:'rgba(16,185,129,.1)', color:'#10b981' }}>
+                  <div className="w-7 h-7 rounded-md flex items-center justify-center text-xs font-black shrink-0"
+                    style={{ background:'rgb(var(--up) / .1)', color:'rgb(var(--up))' }}>
                     {s.symbol.charAt(0)}
                   </div>
                   <div>
@@ -131,20 +131,21 @@ export default function Markets() {
         </div>
 
         {/* Losers */}
-        <div className="card-flat rounded-2xl overflow-hidden border" style={{ borderColor:'var(--border)', padding:0 }}>
+        <div className="card-flat overflow-hidden" style={{ padding:0 }}>
           <div className="px-4 py-3 border-b flex items-center gap-2"
             style={{ borderColor:'var(--border)', background:'var(--bg-2)' }}>
             <TrendingDown size={14} className="text-red-400"/>
-            <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Top Losers</span>
+            <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Top losers</span>
           </div>
           <div style={{ background:'var(--bg-1)' }}>
+            {!losers.length && <p className="px-4 py-8 text-sm text-center" style={{ color:'var(--text-3)' }}>No live prices yet. Losers appear once quotes load.</p>}
             {losers.map((s, i) => (
               <Link key={s.symbol} to={`/stock/${s.symbol}`}
-                className="flex items-center justify-between px-4 py-2.5 border-b transition-colors hover:bg-red-400/5 group"
+                className="flex items-center justify-between px-4 py-2.5 border-b transition-colors hover:bg-red-400/5 group last:border-b-0"
                 style={{ borderColor:'var(--border)' }}>
                 <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0"
-                    style={{ background:'rgba(239,68,68,.1)', color:'#ef4444' }}>
+                  <div className="w-7 h-7 rounded-md flex items-center justify-center text-xs font-black shrink-0"
+                    style={{ background:'rgb(var(--down) / .1)', color:'rgb(var(--down))' }}>
                     {s.symbol.charAt(0)}
                   </div>
                   <div>
@@ -165,10 +166,11 @@ export default function Markets() {
         </div>
 
         {/* Sector Performance */}
-        <div className="card border" style={{ borderColor:'var(--border)' }}>
+        <div className="card-flat">
           <div className="flex items-center gap-2 mb-4">
             <Activity size={14} style={{ color:'var(--accent)' }}/>
-            <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Sector Performance</span>
+            <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Sector performance</span>
+            <span className="section-label ml-auto">Sample figures</span>
           </div>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={sectorPerformance} layout="vertical" margin={{ left:0, right:28 }}>
@@ -178,10 +180,10 @@ export default function Markets() {
                 width={94} axisLine={false} tickLine={false}/>
               <Tooltip
                 formatter={v => [`${v > 0 ? '+' : ''}${v.toFixed(2)}%`, 'Change']}
-                contentStyle={{ background:'var(--bg-2)', border:'1px solid var(--border)', borderRadius:10, fontSize:12, color:'var(--text-1)' }}
+                contentStyle={{ background:'var(--bg-2)', border:'1px solid var(--border)', borderRadius:8, fontSize:12, color:'var(--text-1)' }}
               />
-              <Bar dataKey="change" radius={[0,5,5,0]}>
-                {sectorPerformance.map((e,i) => <Cell key={i} fill={e.change >= 0 ? '#10b981' : '#ef4444'}/>)}
+              <Bar dataKey="change" radius={[0,4,4,0]}>
+                {sectorPerformance.map((e,i) => <Cell key={i} fill={e.change >= 0 ? 'rgb(var(--up))' : 'rgb(var(--down))'}/>)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -189,30 +191,30 @@ export default function Markets() {
       </div>
 
       {/* ── Stock table ── */}
-      <div className="rounded-2xl overflow-hidden border" style={{ borderColor:'var(--border)' }}>
+      <div className="rounded-xl overflow-hidden border" style={{ borderColor:'var(--border)' }}>
         {/* Controls */}
         <div className="px-4 py-3 border-b flex flex-col sm:flex-row gap-3 flex-wrap"
           style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
           <div className="relative flex-1 max-w-xs">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color:'var(--text-3)' }}/>
-            <input className="input text-sm pl-9 py-2" placeholder="Search symbol or name…"
+            <input aria-label="Search stocks" className="input text-sm pl-9 py-2" placeholder="Search symbol or name"
               value={search} onChange={e => setSearch(e.target.value)}/>
           </div>
           <div className="flex items-center gap-1 flex-wrap">
             <Filter size={12} style={{ color:'var(--text-3)' }}/>
             {SECTORS.map(s => (
               <button key={s} onClick={() => setSector(s)}
-                className="text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-all"
+                className="text-xs px-2.5 py-1.5 rounded-md font-semibold transition-colors"
                 style={sector === s
-                  ? { background:`rgba(var(--accent-rgb),.12)`, color:'var(--accent)', border:`1px solid rgba(var(--accent-rgb),.2)` }
-                  : { color:'var(--text-3)', border:'1px solid transparent' }
+                  ? { background:'rgba(var(--accent-rgb),.12)', color:'var(--text-1)', border:'1px solid rgba(var(--accent-rgb),.25)' }
+                  : { background:'transparent', color:'var(--text-2)', border:'1px solid transparent' }
                 }>{s}</button>
             ))}
           </div>
           <div className="flex items-center gap-2 ml-auto shrink-0">
             <span className="text-xs" style={{ color:'var(--text-3)' }}>Sort</span>
-            <select value={sortBy} onChange={e => setSortBy(e.target.value)}
-              className="text-xs px-2.5 py-1.5 rounded-lg border outline-none cursor-pointer"
+            <select aria-label="Sort by" value={sortBy} onChange={e => setSortBy(e.target.value)}
+              className="text-xs px-2.5 py-1.5 rounded-md border outline-none cursor-pointer"
               style={{ background:'var(--bg-1)', borderColor:'var(--border)', color:'var(--text-2)' }}>
               <option value="mktCap">Mkt Cap</option>
               <option value="changePct">% Change</option>
@@ -242,7 +244,7 @@ export default function Markets() {
                   className="tr border-b" style={{ borderColor:'var(--border)' }}>
                   <td className="td">
                     <Link to={`/stock/${s.symbol}`} className="flex items-center gap-3 group">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black shrink-0"
+                      <div className="w-8 h-8 rounded-md flex items-center justify-center text-xs font-black shrink-0"
                         style={{ background:`rgba(var(--accent-rgb),.1)`, color:'var(--accent)', border:`1px solid rgba(var(--accent-rgb),.15)` }}>
                         {s.symbol.charAt(0)}
                       </div>
@@ -271,7 +273,7 @@ export default function Markets() {
                       {fmtPct(s.changePct)}
                     </div>
                     {s.change != null && (
-                      <div className={`text-xs ${s.change >= 0 ? 'text-emerald-400/60' : 'text-red-400/60'}`}>
+                      <div className={`text-xs font-mono ${s.change >= 0 ? 'text-emerald-400/60' : 'text-red-400/60'}`}>
                         {fmtChange(s.change)}
                       </div>
                     )}
@@ -283,7 +285,7 @@ export default function Markets() {
                     <span className="text-sm font-mono font-semibold" style={{ color:'var(--text-1)' }}>{s.mktCap}</span>
                   </td>
                   <td className="td text-right hidden sm:table-cell">
-                    <span className="text-xs px-2 py-0.5 rounded-lg" style={{ background:'var(--bg-3)', color:'var(--text-3)' }}>
+                    <span className="text-xs px-2 py-0.5 rounded-md" style={{ background:'var(--bg-3)', color:'var(--text-3)' }}>
                       {s.sector}
                     </span>
                   </td>
@@ -296,6 +298,11 @@ export default function Markets() {
               ))}
             </tbody>
           </table>
+          {!filtered.length && (
+            <p className="px-4 py-12 text-sm text-center" style={{ color:'var(--text-3)' }}>
+              No securities match. Clear the search or pick another sector.
+            </p>
+          )}
         </div>
 
         <div className="px-4 py-2.5 flex items-center justify-between"
@@ -303,7 +310,9 @@ export default function Markets() {
           <span className="text-xs" style={{ color:'var(--text-3)' }}>
             {filtered.length} securities · {stocks.filter(s => s.changePct != null && s.changePct >= 0).length} advancing · {stocks.filter(s => s.changePct != null && s.changePct < 0).length} declining
           </span>
-          <span className="text-xs" style={{ color:'var(--text-3)' }}>Updated just now</span>
+          <span className="text-xs font-mono" style={{ color:'var(--text-3)' }}>
+            {lastUpdated ? `Updated ${new Date(lastUpdated).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}` : isLive ? 'Showing last saved prices' : 'Waiting for prices'}
+          </span>
         </div>
       </div>
 

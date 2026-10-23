@@ -1,21 +1,22 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, X, GitCompare, TrendingUp, TrendingDown, Brain, Plus } from 'lucide-react'
+import { Search, X, GitCompare, Brain, Plus } from 'lucide-react'
 import { stocks as baseStocks } from '../data/mockData'
 import { generateAIAnalysis, generateComparisonSummary } from '../utils/aiAnalysis'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
 import { fmtPrice, fmtPct } from '../utils/formatLive'
+import PageHeader from '../components/PageHeader'
 
 /* ── Verdict badge ─────────────────────────────────────────── */
 const VerdictBadge = ({ verdict }) => {
   const cfg = {
-    Bullish: { color:'#10b981', bg:'rgba(16,185,129,.1)', border:'rgba(16,185,129,.2)' },
-    Bearish: { color:'#ef4444', bg:'rgba(239,68,68,.1)',  border:'rgba(239,68,68,.2)'  },
-    Neutral: { color:'#f59e0b', bg:'rgba(245,158,11,.1)', border:'rgba(245,158,11,.2)' },
+    Bullish: { color:'rgb(var(--up))',      bg:'rgb(var(--up) / .1)',      border:'rgb(var(--up) / .2)' },
+    Bearish: { color:'rgb(var(--down))',    bg:'rgb(var(--down) / .1)',    border:'rgb(var(--down) / .2)' },
+    Neutral: { color:'rgb(var(--caution))', bg:'rgb(var(--caution) / .1)', border:'rgb(var(--caution) / .2)' },
   }[verdict] || {}
   return (
-    <span className="text-xs font-bold px-2.5 py-1 rounded-full"
+    <span className="text-xs font-bold px-2.5 py-1 rounded-md"
       style={{ color:cfg.color, background:cfg.bg, border:`1px solid ${cfg.border}` }}>
       {verdict}
     </span>
@@ -51,7 +52,8 @@ function StockSearch({ onAdd, existing }) {
         <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color:'var(--text-3)' }}/>
         <input
           className="input text-sm pl-9 py-2.5 w-full"
-          placeholder="Search symbol or company…"
+          aria-label="Search symbol or company"
+          placeholder="Search symbol or company"
           value={query}
           onChange={e => setQuery(e.target.value)}
           onFocus={() => setFocused(true)}
@@ -62,7 +64,7 @@ function StockSearch({ onAdd, existing }) {
         {focused && results.length > 0 && (
           <motion.div
             initial={{ opacity:0, y:4 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:4 }}
-            className="absolute z-50 w-full mt-1 rounded-xl border shadow-xl overflow-hidden"
+            className="absolute z-50 w-full mt-1 rounded-lg border shadow-xl overflow-hidden"
             style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
             {results.map(s => (
               <button key={s.symbol} onMouseDown={() => handleSelect(s)}
@@ -71,7 +73,7 @@ function StockSearch({ onAdd, existing }) {
                 onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-3)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0"
+                  <div className="w-7 h-7 rounded-md flex items-center justify-center text-xs font-black shrink-0"
                     style={{ background:`rgba(var(--accent-rgb),.1)`, color:'var(--accent)' }}>
                     {s.symbol.charAt(0)}
                   </div>
@@ -84,7 +86,7 @@ function StockSearch({ onAdd, existing }) {
                   <div className="text-sm font-mono font-semibold" style={{ color: s.price != null ? 'var(--text-1)' : 'var(--text-3)' }}>
                     {fmtPrice(s.price)}
                   </div>
-                  <div className={`text-xs font-bold ${s.changePct == null ? 'text-slate-500' : s.changePct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <div className={`text-xs font-bold font-mono ${s.changePct == null ? 'text-[var(--text-3)]' : s.changePct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                     {fmtPct(s.changePct)}
                   </div>
                 </div>
@@ -152,17 +154,15 @@ export default function Compare() {
     if (!stocks.length) return []
     return [
       { label:'Price',       vals: stocks.map(s => fmtPrice(s.price)) },
-      { label:'Day Change',  vals: stocks.map(s => fmtPct(s.changePct)),
-        colors: stocks.map(s => s.changePct == null ? '#94a3b8' : s.changePct >= 0 ? '#10b981' : '#ef4444') },
-      { label:'Market Cap',  vals: stocks.map(s => s.mktCap) },
-      { label:'P/E Ratio',   vals: stocks.map(s => s.pe ? `${s.pe}x` : null) },
-      { label:'EPS',         vals: stocks.map(s => s.pe && s.price != null ? `$${(s.price / s.pe).toFixed(2)}` : null) },
+      { label:'Day change',  vals: stocks.map(s => fmtPct(s.changePct)),
+        colors: stocks.map(s => s.changePct == null ? 'var(--text-3)' : s.changePct >= 0 ? 'rgb(var(--up))' : 'rgb(var(--down))') },
+      { label:'Market cap',  vals: stocks.map(s => s.mktCap) },
+      { label:'P/E ratio',   vals: stocks.map(s => s.pe ? `${s.pe}x` : null) },
+      { label:'EPS (price ÷ P/E)',         vals: stocks.map(s => s.pe && s.price != null ? `$${(s.price / s.pe).toFixed(2)}` : null) },
       { label:'Volume',      vals: stocks.map(s => s.volume) },
-      { label:'52W High',    vals: stocks.map(s => s.price != null ? `$${(s.price * 1.28).toFixed(2)}` : '—') },
-      { label:'52W Low',     vals: stocks.map(s => s.price != null ? `$${(s.price * 0.64).toFixed(2)}` : '—') },
       { label:'Sector',      vals: stocks.map(s => s.sector) },
       { label:'Exchange',    vals: stocks.map(s => s.exchange || 'NASDAQ') },
-      { label:'AI Verdict',  vals: null, badges: stocks.map(s => generateAIAnalysis(s)?.verdict) },
+      { label:'AI verdict',  vals: null, badges: stocks.map(s => generateAIAnalysis(s)?.verdict) },
     ]
   }
 
@@ -172,25 +172,17 @@ export default function Compare() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6 page-enter">
 
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-black flex items-center gap-2.5" style={{ color:'var(--text-1)' }}>
-          <GitCompare size={21} style={{ color:'var(--accent)' }}/>
-          Stock Comparison
-        </h1>
-        <p className="text-sm mt-0.5" style={{ color:'var(--text-3)' }}>
-          Compare up to 3 stocks side by side with AI analysis
-        </p>
-      </div>
+      <PageHeader title="Compare" subtitle="Put up to three stocks side by side on price, valuation and the AI read." />
 
       {/* Search + selected chips */}
-      <div className="card border" style={{ borderColor:'var(--border)' }}>
+      <div className="card-flat">
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           {selectedStocks.map(s => (
             <div key={s.symbol}
-              className="flex items-center gap-2 text-sm font-bold px-3 py-1.5 rounded-xl border"
-              style={{ background:`rgba(var(--accent-rgb),.08)`, borderColor:`rgba(var(--accent-rgb),.2)`, color:'var(--accent)' }}>
+              className="flex items-center gap-2 text-sm font-bold font-mono px-3 py-1.5 rounded-md border"
+              style={{ background:'rgba(var(--accent-rgb),.12)', borderColor:'rgba(var(--accent-rgb),.25)', color:'var(--text-1)' }}>
               {s.symbol}
-              <button onClick={() => removeStock(s.symbol)}
+              <button onClick={() => removeStock(s.symbol)} aria-label={`Remove ${s.symbol}`}
                 className="ml-0.5 hover:opacity-70 transition-opacity">
                 <X size={12}/>
               </button>
@@ -198,7 +190,7 @@ export default function Compare() {
           ))}
           {selectedStocks.length < 3 && (
             <span className="text-xs" style={{ color:'var(--text-3)' }}>
-              {selectedStocks.length === 0 ? 'Add up to 3 stocks to compare' : `Add ${3 - selectedStocks.length} more`}
+              {selectedStocks.length === 0 ? 'Add up to 3 stocks to compare' : selectedStocks.length === 1 ? 'Add at least one more to compare' : 'Add one more, or compare these two'}
             </span>
           )}
         </div>
@@ -211,17 +203,17 @@ export default function Compare() {
       {selectedStocks.length === 0 && (
         <motion.div
           initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
-          className="card border text-center py-16" style={{ borderColor:'var(--border)' }}>
-          <GitCompare size={40} className="mx-auto mb-4 opacity-20" style={{ color:'var(--text-3)' }}/>
-          <p className="text-sm font-semibold" style={{ color:'var(--text-2)' }}>Start comparing stocks</p>
-          <p className="text-xs mt-1" style={{ color:'var(--text-3)' }}>Search and add up to 3 stocks above</p>
+          className="card-flat text-center py-16">
+          <GitCompare size={32} className="mx-auto mb-4 opacity-30" style={{ color:'var(--text-3)' }}/>
+          <p className="text-sm font-semibold" style={{ color:'var(--text-2)' }}>No stocks selected</p>
+          <p className="text-xs mt-1" style={{ color:'var(--text-3)' }}>Search a ticker or company above to add your first stock.</p>
         </motion.div>
       )}
 
       {/* Comparison table */}
       {selectedStocks.length >= 2 && (
         <motion.div initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
-          className="rounded-2xl overflow-hidden border" style={{ borderColor:'var(--border)' }}>
+          className="rounded-xl overflow-hidden border" style={{ borderColor:'var(--border)' }}>
 
           {/* Table head — stock names */}
           <div className="overflow-x-auto">
@@ -233,8 +225,8 @@ export default function Compare() {
                   {selectedStocks.map(s => (
                     <th key={s.symbol} className="px-4 py-4 text-center">
                       <div className="flex flex-col items-center gap-1">
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black mx-auto"
-                          style={{ background:`rgba(var(--accent-rgb),.12)`, color:'var(--accent)' }}>
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-black mx-auto"
+                          style={{ background:'rgba(var(--accent-rgb),.12)', color:'var(--accent)' }}>
                           {s.symbol.charAt(0)}
                         </div>
                         <div className="text-sm font-black" style={{ color:'var(--text-1)' }}>{s.symbol}</div>
@@ -245,7 +237,7 @@ export default function Compare() {
                   {selectedStocks.length < 3 && (
                     <th className="px-4 py-4 text-center">
                       <div className="flex flex-col items-center gap-1 opacity-30">
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center border border-dashed mx-auto"
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center border border-dashed mx-auto"
                           style={{ borderColor:'var(--border)' }}>
                           <Plus size={14} style={{ color:'var(--text-3)' }}/>
                         </div>
@@ -287,7 +279,7 @@ export default function Compare() {
             return (
               <motion.div key={symbol}
                 initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
-                className="card border space-y-3" style={{ borderColor:'var(--border)' }}>
+                className="card-flat space-y-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <Link to={`/stock/${symbol}`}
@@ -299,10 +291,10 @@ export default function Compare() {
                   </div>
                   <VerdictBadge verdict={ai.verdict}/>
                 </div>
-                <div className="rounded-xl p-3 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
+                <div className="rounded-lg p-3 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
                   <p className="text-xs leading-relaxed" style={{ color:'var(--text-2)' }}>{ai.summary}</p>
                 </div>
-                <div className="rounded-xl p-3 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
+                <div className="rounded-lg p-3 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
                   <div className="text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color:'var(--text-3)' }}>Technical</div>
                   <p className="text-xs leading-relaxed" style={{ color:'var(--text-2)' }}>{ai.techSummary}</p>
                 </div>
@@ -312,10 +304,10 @@ export default function Compare() {
         </div>
       )}
 
-      {/* AI Comparison Summary */}
+      {/* AI comparison summary */}
       {compSummary && (
         <motion.div initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
-          className="card border" style={{ borderColor:'var(--border)' }}>
+          className="card-flat">
           <div className="flex items-center gap-2 mb-3">
             <Brain size={14} style={{ color:'var(--accent)' }}/>
             <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>AI Comparison Summary</span>

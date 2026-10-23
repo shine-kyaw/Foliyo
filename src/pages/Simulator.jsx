@@ -2,13 +2,13 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  TrendingUp, TrendingDown, Search, BarChart2,
-  ShoppingCart, Brain, Clock, AlertTriangle, RefreshCw,
-  ArrowUp, ArrowDown, X, Cpu, Trophy, Flame,
+  TrendingUp, TrendingDown, Search, Brain, AlertTriangle, RefreshCw,
+  ArrowUp, ArrowDown, X, Check,
 } from 'lucide-react'
 import { stocks as allStocks } from '../data/mockData'
 import { useQuote } from '../hooks/useQuote'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
+import PageHeader from '../components/PageHeader'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts'
@@ -119,7 +119,7 @@ function deriveInsights(holdings, cash, trades) {
 const ChartTip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-xl px-3 py-2 text-xs border shadow-lg"
+    <div className="rounded-lg px-3 py-2 text-xs border shadow-lg"
       style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
       <p style={{ color:'var(--text-3)' }}>{label}</p>
       <p className="font-bold font-mono" style={{ color:'var(--text-1)' }}>
@@ -153,11 +153,11 @@ function TradeSearch({ onSelect }) {
 
   return (
     <div className="relative">
-      <div className="relative flex items-center rounded-xl border overflow-hidden"
-        style={{ background:'var(--bg-1)', borderColor: open ? 'rgba(var(--accent-rgb),.4)' : 'var(--border)' }}>
+      <div className="relative flex items-center rounded-lg border overflow-hidden"
+        style={{ background:'var(--bg-1)', borderColor: open ? 'rgba(var(--accent-rgb),.5)' : 'var(--border)' }}>
         <Search size={13} className="ml-3 shrink-0" style={{ color:'var(--text-3)' }}/>
         <input className="flex-1 bg-transparent text-sm px-2.5 py-2.5 outline-none"
-          style={{ color:'var(--text-1)' }}
+          style={{ color:'var(--text-1)' }} aria-label="Search stock to trade"
           placeholder="Search stock to trade…"
           value={q}
           onChange={e => setQ(e.target.value)}
@@ -167,7 +167,7 @@ function TradeSearch({ onSelect }) {
       <AnimatePresence>
         {open && results.length > 0 && (
           <motion.div initial={{ opacity:0, y:4 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:4 }}
-            className="absolute left-0 right-0 mt-1 rounded-xl border shadow-2xl overflow-hidden z-50"
+            className="absolute left-0 right-0 mt-1 rounded-lg border shadow-2xl overflow-hidden z-50"
             style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
             {results.map(s => (
               <button key={s.symbol} onMouseDown={() => pick(s)}
@@ -214,7 +214,7 @@ function HoldingRow({ h, totalValue, onSell }) {
     <tr className="tr border-b" style={{ borderColor:'var(--border)' }}>
       <td className="td">
         <Link to={`/stock/${h.symbol}`} className="flex items-center gap-2.5 group">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0"
+          <div className="w-7 h-7 rounded-md flex items-center justify-center text-xs font-black shrink-0"
             style={{ background:`rgba(var(--accent-rgb),.1)`, color:'var(--accent)' }}>
             {h.symbol.charAt(0)}
           </div>
@@ -229,7 +229,7 @@ function HoldingRow({ h, totalValue, onSell }) {
       <td className="td text-right font-mono text-sm" style={{ color:'var(--text-2)' }}>${h.avgCost.toFixed(2)}</td>
       <td className="td text-right">
         <div className="font-mono font-semibold text-sm" style={{ color:'var(--text-1)' }}>${cur.toFixed(2)}</div>
-        <div className={`text-xs font-bold ${dayChg >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+        <div className={`text-xs font-bold font-mono ${dayChg >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
           {dayChg >= 0 ? '+' : ''}{dayChg.toFixed(2)}% today
         </div>
       </td>
@@ -240,17 +240,17 @@ function HoldingRow({ h, totalValue, onSell }) {
         <div className={`text-sm font-bold font-mono ${pl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
           {pl >= 0 ? '+' : ''}${Math.abs(pl).toFixed(2)}
         </div>
-        <div className={`text-xs ${pl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+        <div className={`text-xs font-mono ${pl >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
           {plPct >= 0 ? '+' : ''}{plPct.toFixed(2)}%
         </div>
       </td>
       <td className="td text-right hidden md:table-cell">
         <span className="text-sm font-mono" style={{ color:'var(--text-2)' }}>{wt.toFixed(1)}%</span>
       </td>
-      <td className="td text-right hidden md:table-cell">
+      <td className="td text-right">
         <button onClick={() => onSell(sellStock)}
-          className="text-xs px-2.5 py-1.5 rounded-lg border transition-all"
-          style={{ borderColor:'rgba(239,68,68,.25)', color:'#ef4444', background:'rgba(239,68,68,.06)' }}>
+          className="text-xs px-2.5 py-1.5 rounded-md border transition-colors"
+          style={{ borderColor:'rgb(var(--down) / .28)', color:'rgb(var(--down))', background:'rgb(var(--down) / .08)' }}>
           Sell
         </button>
       </td>
@@ -299,14 +299,16 @@ export default function Simulator() {
   const insights = useMemo(() => deriveInsights(holdings, cash, trades), [holdings, cash, trades])
 
   /* ── Trade helpers ── */
-  const tradeTotal  = tradeStock ? parseFloat(qty || 0) * tradeStock.price : 0
-  const maxShares   = tradeStock ? Math.floor(cash / tradeStock.price) : 0
+  const hasPrice    = tradeStock?.price != null
+  const tradeTotal  = hasPrice ? parseFloat(qty || 0) * tradeStock.price : 0
+  const maxShares   = hasPrice ? Math.floor(cash / tradeStock.price) : 0
   const ownedShares = tradeStock ? (holdings.find(h => h.symbol === tradeStock.symbol)?.shares ?? 0) : 0
 
   const resetForm = () => { setTradeStock(null); setQty(''); setTradeError(''); setTradeSuccess('') }
 
   const executeTrade = () => {
     if (!tradeStock) return
+    if (!hasPrice) { setTradeError('No price for this stock yet. Wait a moment and try again.'); return }
     const n = parseInt(qty)
     if (!n || n <= 0) { setTradeError('Enter a valid number of shares.'); return }
 
@@ -357,54 +359,46 @@ export default function Simulator() {
   }
 
   const INSIGHT_CFG = {
-    info:     { color:'var(--accent)',  bg:`rgba(var(--accent-rgb),.08)`, Icon: Brain    },
-    positive: { color:'#10b981',        bg:'rgba(16,185,129,.08)',        Icon: TrendingUp },
-    negative: { color:'#ef4444',        bg:'rgba(239,68,68,.08)',         Icon: TrendingDown },
-    warning:  { color:'#f59e0b',        bg:'rgba(245,158,11,.08)',        Icon: AlertTriangle },
+    info:     { color:'var(--accent)',        bg:`rgba(var(--accent-rgb),.08)`, Icon: Brain    },
+    positive: { color:'rgb(var(--up))',       bg:'rgb(var(--up) / .08)',        Icon: TrendingUp },
+    negative: { color:'rgb(var(--down))',     bg:'rgb(var(--down) / .08)',      Icon: TrendingDown },
+    warning:  { color:'rgb(var(--caution))',  bg:'rgb(var(--caution) / .08)',   Icon: AlertTriangle },
   }
+
+  const upC   = 'rgb(var(--up))'
+  const downC = 'rgb(var(--down))'
+  const dirC  = isUp ? upC : downC
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6 page-enter">
 
       {/* ── Header ── */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-black flex items-center gap-2.5" style={{ color:'var(--text-1)' }}>
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background:'linear-gradient(135deg,#8b5cf6,#06b6d4)' }}>
-              <Cpu size={16} className="text-white"/>
-            </div>
-            Stock Simulator
-          </h1>
-          <p className="text-sm mt-0.5" style={{ color:'var(--text-3)' }}>
-            Practice investing with $100,000 virtual cash — no real money involved
-          </p>
-        </div>
-        <button onClick={() => setShowReset(true)}
-          className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl border transition-all"
-          style={{ borderColor:'var(--border)', color:'var(--text-3)' }}>
-          <RefreshCw size={12}/> Reset Portfolio
+      <PageHeader title="Stock Simulator" subtitle="Practice investing with $100,000 of virtual cash — no real money involved">
+        <button onClick={() => setShowReset(true)} className="btn-ghost text-xs py-2 px-3">
+          <RefreshCw size={12}/> Reset portfolio
         </button>
-      </div>
+      </PageHeader>
 
       {/* ── Reset confirm ── */}
       <AnimatePresence>
         {showReset && (
           <motion.div initial={{ opacity:0, y:-8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-8 }}
-            className="rounded-2xl border p-4 flex items-center gap-4 flex-wrap"
-            style={{ background:'rgba(239,68,68,.06)', borderColor:'rgba(239,68,68,.2)' }}>
-            <AlertTriangle size={16} className="text-red-400 shrink-0"/>
+            role="alert"
+            className="rounded-xl border p-4 flex items-center gap-4 flex-wrap"
+            style={{ background:'rgb(var(--down) / .06)', borderColor:'rgb(var(--down) / .22)' }}>
+            <AlertTriangle size={16} className="shrink-0" style={{ color:downC }}/>
             <p className="text-sm flex-1" style={{ color:'var(--text-2)' }}>
-              This will clear all holdings and trades and reset your cash to $100,000.
+              This will clear all holdings and trades and reset your cash to <span className="font-mono">$100,000</span>.
             </p>
             <div className="flex gap-2">
               <button onClick={doReset}
-                className="text-xs px-3 py-2 rounded-lg font-bold bg-red-400/15 text-red-400 border border-red-400/25 transition-all hover:bg-red-400/25">
-                Yes, Reset
+                className="text-xs px-3 py-2 rounded-md font-bold border transition-colors"
+                style={{ color:downC, background:'rgb(var(--down) / .12)', borderColor:'rgb(var(--down) / .3)' }}>
+                Yes, reset
               </button>
               <button onClick={() => setShowReset(false)}
-                className="text-xs px-3 py-2 rounded-lg font-bold border transition-all"
-                style={{ borderColor:'var(--border)', color:'var(--text-3)' }}>
+                className="text-xs px-3 py-2 rounded-md font-bold border transition-colors"
+                style={{ borderColor:'var(--border-light)', color:'var(--text-2)' }}>
                 Cancel
               </button>
             </div>
@@ -419,40 +413,34 @@ export default function Simulator() {
             label:'Portfolio Value',
             value:`$${totalValue.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`,
             sub: `${isUp?'+':''}${returnPct.toFixed(2)}%`,
-            subColor: isUp?'#10b981':'#ef4444',
-            bg: isUp ? 'rgba(16,185,129,.06)' : 'rgba(239,68,68,.06)',
-            border: isUp ? 'rgba(16,185,129,.18)' : 'rgba(239,68,68,.18)',
+            subColor: dirC,
           },
           {
             label:'Total Return',
-            value:`${isUp?'+':''}$${Math.abs(totalReturn).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`,
+            value:`${isUp?'+':'-'}$${Math.abs(totalReturn).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`,
+            valueColor: dirC,
             sub: `vs $${STARTING_CASH.toLocaleString()} start`,
             subColor:'var(--text-3)',
-            bg: isUp ? 'rgba(16,185,129,.06)' : 'rgba(239,68,68,.06)',
-            border: isUp ? 'rgba(16,185,129,.18)' : 'rgba(239,68,68,.18)',
           },
           {
             label:'Cash Available',
             value:`$${cash.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`,
             sub:`${(cash/totalValue*100).toFixed(0)}% of portfolio`,
             subColor:'var(--text-3)',
-            bg:'var(--bg-2)', border:'var(--border)',
           },
           {
             label:'Holdings',
             value: holdings.length,
             sub: `${trades.length} trade${trades.length !== 1?'s':''}`,
             subColor:'var(--text-3)',
-            bg:'var(--bg-2)', border:'var(--border)',
           },
         ].map(c => (
           <motion.div key={c.label}
             initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }}
-            className="rounded-2xl p-4 border"
-            style={{ background:c.bg, borderColor:c.border }}>
-            <div className="text-xs font-medium mb-2" style={{ color:'var(--text-3)' }}>{c.label}</div>
-            <div className="text-xl font-black font-mono" style={{ color:'var(--text-1)' }}>{c.value}</div>
-            <div className="text-xs font-semibold mt-0.5" style={{ color:c.subColor }}>{c.sub}</div>
+            className="card-flat min-w-0 !p-4">
+            <div className="section-label mb-2">{c.label}</div>
+            <div className="text-xl font-black font-mono truncate" style={{ color: c.valueColor || 'var(--text-1)' }}>{c.value}</div>
+            <div className="text-xs font-mono font-semibold mt-1" style={{ color:c.subColor }}>{c.sub}</div>
           </motion.div>
         ))}
       </div>
@@ -469,30 +457,16 @@ export default function Simulator() {
         const worst = rows.reduce((a, b) => b.plPct < a.plPct ? b : a)
         return (
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl p-4 border flex items-center gap-3"
-              style={{ background:'rgba(16,185,129,.05)', borderColor:'rgba(16,185,129,.18)' }}>
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background:'rgba(16,185,129,.12)' }}>
-                <Trophy size={16} className="text-emerald-400"/>
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs font-medium mb-0.5" style={{ color:'var(--text-3)' }}>Best Performer</div>
-                <div className="font-black text-sm" style={{ color:'var(--text-1)' }}>{best.symbol}</div>
-                <div className="text-xs font-bold text-emerald-400">+{best.plPct.toFixed(2)}% total return</div>
-              </div>
+            <div className="card-flat min-w-0 !p-4">
+              <div className="section-label mb-2">Best performer</div>
+              <div className="font-black text-sm" style={{ color:'var(--text-1)' }}>{best.symbol}</div>
+              <div className="text-xs font-bold font-mono text-emerald-400">+{best.plPct.toFixed(2)}% total return</div>
             </div>
-            <div className="rounded-2xl p-4 border flex items-center gap-3"
-              style={{ background:'rgba(239,68,68,.05)', borderColor:'rgba(239,68,68,.18)' }}>
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background:'rgba(239,68,68,.12)' }}>
-                <Flame size={16} className="text-red-400"/>
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs font-medium mb-0.5" style={{ color:'var(--text-3)' }}>Worst Performer</div>
-                <div className="font-black text-sm" style={{ color:'var(--text-1)' }}>{worst.symbol}</div>
-                <div className={`text-xs font-bold ${worst.plPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {worst.plPct >= 0 ? '+' : ''}{worst.plPct.toFixed(2)}% total return
-                </div>
+            <div className="card-flat min-w-0 !p-4">
+              <div className="section-label mb-2">Worst performer</div>
+              <div className="font-black text-sm" style={{ color:'var(--text-1)' }}>{worst.symbol}</div>
+              <div className={`text-xs font-bold font-mono ${worst.plPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                {worst.plPct >= 0 ? '+' : ''}{worst.plPct.toFixed(2)}% total return
               </div>
             </div>
           </div>
@@ -503,19 +477,16 @@ export default function Simulator() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
         {/* Chart */}
-        <div className="lg:col-span-2 card border" style={{ borderColor:'var(--border)' }}>
+        <div className="lg:col-span-2 card-flat">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-            <div className="flex items-center gap-2">
-              <BarChart2 size={14} style={{ color:'var(--accent)' }}/>
-              <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Portfolio Performance</span>
-            </div>
+            <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Portfolio Performance</span>
             <div className="flex gap-1">
               {['1D','1W','1M','3M','1Y','All'].map(r => (
                 <button key={r} onClick={() => setChartRange(r)}
-                  className="text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-all"
+                  className="text-xs px-2.5 py-1.5 rounded-md font-semibold transition-colors"
                   style={chartRange === r
-                    ? { background:`rgba(var(--accent-rgb),.12)`, color:'var(--accent)', border:`1px solid rgba(var(--accent-rgb),.2)` }
-                    : { color:'var(--text-3)', border:'1px solid transparent' }
+                    ? { background:`rgba(var(--accent-rgb),.12)`, color:'var(--text-1)', border:`1px solid rgba(var(--accent-rgb),.25)` }
+                    : { color:'var(--text-2)', border:'1px solid transparent' }
                   }>{r}</button>
               ))}
             </div>
@@ -524,40 +495,37 @@ export default function Simulator() {
             <AreaChart data={chartData} margin={{ top:5, right:5, bottom:0, left:5 }}>
               <defs>
                 <linearGradient id="simGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor={isUp?'#10b981':'#ef4444'} stopOpacity={0.18}/>
-                  <stop offset="95%" stopColor={isUp?'#10b981':'#ef4444'} stopOpacity={0}/>
+                  <stop offset="5%"  stopColor={dirC} stopOpacity={0.18}/>
+                  <stop offset="95%" stopColor={dirC} stopOpacity={0}/>
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false}/>
-              <XAxis dataKey="date" tick={{ fontSize:10, fill:'var(--text-3)' }}
+              <CartesianGrid stroke="var(--border)" vertical={false}/>
+              <XAxis dataKey="date" tick={{ fontSize:11, fill:'var(--text-3)' }}
                 interval={Math.floor(chartData.length/5)} axisLine={false} tickLine={false}/>
-              <YAxis tick={{ fontSize:10, fill:'var(--text-3)' }} domain={['auto','auto']}
+              <YAxis tick={{ fontSize:11, fill:'var(--text-3)' }} domain={['auto','auto']}
                 axisLine={false} tickLine={false}
                 tickFormatter={v => `$${(v/1000).toFixed(0)}k`} width={48}/>
               <Tooltip content={<ChartTip/>}/>
               <Area type="monotone" dataKey="value"
-                stroke={isUp?'#10b981':'#ef4444'} strokeWidth={2.5} fill="url(#simGrad)"/>
+                stroke={dirC} strokeWidth={2} fill="url(#simGrad)"/>
             </AreaChart>
           </ResponsiveContainer>
         </div>
 
         {/* Trade form */}
-        <div className="card border space-y-4" style={{ borderColor:'var(--border)' }}>
-          <div className="flex items-center gap-2">
-            <ShoppingCart size={14} style={{ color:'var(--accent)' }}/>
-            <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Place Trade</span>
-          </div>
+        <div className="card-flat space-y-4">
+          <span className="block text-sm font-bold" style={{ color:'var(--text-1)' }}>Place Trade</span>
 
           {/* Buy / Sell toggle */}
-          <div className="flex rounded-xl overflow-hidden border" style={{ borderColor:'var(--border)' }}>
+          <div className="flex rounded-lg overflow-hidden border" style={{ borderColor:'var(--border)' }}>
             {['buy','sell'].map(m => (
               <button key={m} onClick={() => { setTradeMode(m); setTradeError(''); setTradeSuccess('') }}
-                className="flex-1 py-2 text-sm font-bold capitalize transition-all"
+                className="flex-1 py-2 text-sm font-bold capitalize transition-colors"
                 style={tradeMode === m
                   ? m === 'buy'
-                    ? { background:'rgba(16,185,129,.15)', color:'#10b981' }
-                    : { background:'rgba(239,68,68,.15)', color:'#ef4444' }
-                  : { color:'var(--text-3)', background:'var(--bg-1)' }
+                    ? { background:'rgb(var(--up) / .14)', color:upC }
+                    : { background:'rgb(var(--down) / .14)', color:downC }
+                  : { color:'var(--text-2)', background:'var(--bg-1)' }
                 }>{m}</button>
             ))}
           </div>
@@ -568,21 +536,23 @@ export default function Simulator() {
           {/* Selected stock info */}
           {tradeStock && (
             <motion.div initial={{ opacity:0, y:6 }} animate={{ opacity:1, y:0 }}
-              className="rounded-xl p-3 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
+              className="rounded-lg p-3 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
               <div className="flex items-center justify-between">
                 <div>
                   <div className="font-bold text-sm" style={{ color:'var(--text-1)' }}>{tradeStock.symbol}</div>
                   <div className="text-xs truncate" style={{ color:'var(--text-3)' }}>{tradeStock.name}</div>
                 </div>
-                <div className="text-right">
-                  <div className="font-mono font-bold text-sm" style={{ color:'var(--text-1)' }}>
-                    ${tradeStock.price.toFixed(2)}
+                <div className="text-right font-mono">
+                  <div className="font-bold text-sm" style={{ color:'var(--text-1)' }}>
+                    {hasPrice ? `$${tradeStock.price.toFixed(2)}` : '—'}
                   </div>
-                  <div className={`text-xs font-bold ${tradeStock.changePct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {tradeStock.changePct >= 0 ? '+' : ''}{tradeStock.changePct.toFixed(2)}%
+                  <div className={`text-xs font-bold ${tradeStock.changePct == null ? '' : tradeStock.changePct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+                    style={tradeStock.changePct == null ? { color:'var(--text-3)' } : undefined}>
+                    {tradeStock.changePct == null ? 'Loading price' : `${tradeStock.changePct >= 0 ? '+' : ''}${tradeStock.changePct.toFixed(2)}%`}
                   </div>
                 </div>
-                <button onClick={resetForm} className="ml-2 p-1 rounded-lg hover:bg-white/5 transition-colors"
+                <button onClick={resetForm} aria-label="Clear selected stock"
+                  className="ml-2 p-1 rounded-md hover:bg-[var(--bg-3)] transition-colors"
                   style={{ color:'var(--text-3)' }}>
                   <X size={13}/>
                 </button>
@@ -592,20 +562,20 @@ export default function Simulator() {
 
           {/* Shares input */}
           <div>
-            <div className="text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color:'var(--text-3)' }}>
+            <label htmlFor="sim-qty" className="block section-label mb-1.5">
               Shares
               {tradeStock && tradeMode === 'buy' && (
-                <span className="ml-2 normal-case font-normal" style={{ color:'var(--text-3)' }}>
+                <span className="ml-2 normal-case font-normal tracking-normal font-mono" style={{ color:'var(--text-3)' }}>
                   Max {maxShares.toLocaleString()}
                 </span>
               )}
               {tradeStock && tradeMode === 'sell' && ownedShares > 0 && (
-                <span className="ml-2 normal-case font-normal" style={{ color:'var(--text-3)' }}>
+                <span className="ml-2 normal-case font-normal tracking-normal font-mono" style={{ color:'var(--text-3)' }}>
                   Own {ownedShares}
                 </span>
               )}
-            </div>
-            <input type="number" min="1" step="1"
+            </label>
+            <input id="sim-qty" type="number" min="1" step="1"
               className="input text-sm py-2.5 w-full font-mono"
               placeholder="Number of shares"
               value={qty}
@@ -617,10 +587,10 @@ export default function Simulator() {
           {/* Cost preview */}
           {tradeStock && qty && !isNaN(parseInt(qty)) && (
             <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }}
-              className="rounded-xl p-3 space-y-1.5 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
+              className="rounded-lg p-3 space-y-1.5 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
               <div className="flex justify-between text-xs">
                 <span style={{ color:'var(--text-3)' }}>
-                  {parseInt(qty)} share{parseInt(qty)!==1?'s':''} × ${tradeStock.price.toFixed(2)}
+                  {parseInt(qty)} share{parseInt(qty)!==1?'s':''} × <span className="font-mono">{hasPrice ? `$${tradeStock.price.toFixed(2)}` : '—'}</span>
                 </span>
                 <span className="font-mono font-semibold" style={{ color:'var(--text-1)' }}>
                   ${tradeTotal.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
@@ -629,7 +599,7 @@ export default function Simulator() {
               <div className="flex justify-between text-xs">
                 <span style={{ color:'var(--text-3)' }}>Cash after trade</span>
                 <span className="font-mono font-semibold"
-                  style={{ color: tradeMode==='buy' ? (tradeTotal>cash?'#ef4444':'#10b981') : '#10b981' }}>
+                  style={{ color: tradeMode==='buy' ? (tradeTotal>cash?downC:upC) : upC }}>
                   ${Math.max(0, tradeMode==='buy' ? cash-tradeTotal : cash+tradeTotal).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}
                 </span>
               </div>
@@ -639,45 +609,45 @@ export default function Simulator() {
           {/* Error / Success */}
           <AnimatePresence>
             {tradeError && (
-              <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
-                className="rounded-xl px-3 py-2 text-xs font-medium border"
-                style={{ background:'rgba(239,68,68,.08)', borderColor:'rgba(239,68,68,.2)', color:'#ef4444' }}>
+              <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} role="alert"
+                className="rounded-lg px-3 py-2 text-xs font-medium border"
+                style={{ background:'rgb(var(--down) / .08)', borderColor:'rgb(var(--down) / .22)', color:downC }}>
                 <AlertTriangle size={11} className="inline mr-1.5"/>{tradeError}
               </motion.div>
             )}
             {tradeSuccess && (
-              <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
-                className="rounded-xl px-3 py-2 text-xs font-medium border"
-                style={{ background:'rgba(16,185,129,.08)', borderColor:'rgba(16,185,129,.2)', color:'#10b981' }}>
-                ✓ {tradeSuccess}
+              <motion.div initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }} role="status"
+                className="rounded-lg px-3 py-2 text-xs font-medium border"
+                style={{ background:'rgb(var(--up) / .08)', borderColor:'rgb(var(--up) / .22)', color:upC }}>
+                <Check size={11} className="inline mr-1.5"/>{tradeSuccess}
               </motion.div>
             )}
           </AnimatePresence>
 
           {/* Confirm button */}
           <button onClick={executeTrade} disabled={!tradeStock || !qty}
-            className="w-full py-3 rounded-xl text-sm font-bold transition-all disabled:opacity-40"
+            className={tradeMode === 'buy'
+              ? 'btn-primary w-full justify-center py-3'
+              : 'w-full py-3 rounded-lg text-sm font-bold transition-colors disabled:opacity-40'}
             style={tradeMode === 'buy'
-              ? { background:'rgba(16,185,129,.15)', color:'#10b981', border:'1px solid rgba(16,185,129,.3)' }
-              : { background:'rgba(239,68,68,.15)', color:'#ef4444', border:'1px solid rgba(239,68,68,.3)' }
+              ? undefined
+              : { background:'rgb(var(--down) / .14)', color:downC, border:'1px solid rgb(var(--down) / .3)' }
             }>
-            {tradeMode === 'buy' ? 'Buy Shares' : 'Sell Shares'}
+            {tradeMode === 'buy' ? 'Buy shares' : 'Sell shares'}
           </button>
         </div>
       </div>
 
       {/* ── Holdings table ── */}
-      <div className="card border" style={{ borderColor:'var(--border)' }}>
+      <div className="card-flat">
         <div className="flex items-center gap-2 mb-4">
-          <TrendingUp size={14} style={{ color:'var(--accent)' }}/>
           <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Holdings</span>
-          <span className="text-xs px-1.5 py-0.5 rounded-md font-medium ml-1"
-            style={{ background:'var(--bg-3)', color:'var(--text-3)' }}>{holdings.length}</span>
+          <span className="text-xs px-1.5 py-0.5 rounded-md font-medium font-mono ml-1"
+            style={{ background:'var(--bg-3)', color:'var(--text-2)' }}>{holdings.length}</span>
         </div>
         {holdings.length === 0 ? (
-          <div className="text-center py-12" style={{ color:'var(--text-3)' }}>
-            <TrendingUp size={32} className="mx-auto mb-3 opacity-20"/>
-            <p className="text-sm">No holdings yet — place your first trade above</p>
+          <div className="text-center py-12" style={{ color:'var(--text-2)' }}>
+            <p className="text-sm">No holdings yet. Pick a stock in Place Trade and buy your first shares.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -685,7 +655,7 @@ export default function Simulator() {
               <thead>
                 <tr className="border-b" style={{ borderColor:'var(--border)' }}>
                   {['Asset','Shares','Avg Cost','Current / Today','Value','P&L','Weight','Action'].map((h,i) => (
-                    <th key={h} className={`th ${i===0?'text-left':'text-right'} ${['Weight','Action'].includes(h)?'hidden md:table-cell':''}`}>
+                    <th key={h} className={`th ${i===0?'text-left':'text-right'} ${h==='Weight'?'hidden md:table-cell':''}`}>
                       {h}
                     </th>
                   ))}
@@ -706,13 +676,12 @@ export default function Simulator() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
         {/* AI Coach */}
-        <div className="card border" style={{ borderColor:'var(--border)' }}>
+        <div className="card-flat">
           <div className="flex items-center gap-2 mb-4">
-            <Brain size={14} style={{ color:'var(--accent)' }}/>
             <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>AI Coach</span>
-            <span className="text-xs px-2 py-0.5 rounded-full font-medium ml-1"
-              style={{ background:`rgba(var(--accent-rgb),.08)`, color:'var(--accent)', border:`1px solid rgba(var(--accent-rgb),.15)` }}>
-              Powered by Foliyo AI
+            <span className="text-[11px] px-2 py-0.5 rounded-md font-semibold uppercase tracking-wider ml-1"
+              style={{ background:`rgba(var(--accent-rgb),.08)`, color:'var(--accent)', border:`1px solid rgba(var(--accent-rgb),.22)` }}>
+              Rule-based
             </span>
           </div>
           <div className="space-y-3">
@@ -721,7 +690,7 @@ export default function Simulator() {
               return (
                 <motion.div key={i}
                   initial={{ opacity:0, x:-8 }} animate={{ opacity:1, x:0 }} transition={{ delay:i*0.07 }}
-                  className="flex gap-3 rounded-xl p-3 border"
+                  className="flex gap-3 rounded-lg p-3 border"
                   style={{ background:cfg.bg, borderColor:'var(--border)' }}>
                   <cfg.Icon size={14} className="shrink-0 mt-0.5" style={{ color:cfg.color }}/>
                   <p className="text-xs leading-relaxed" style={{ color:'var(--text-2)' }}>{ins.text}</p>
@@ -732,24 +701,22 @@ export default function Simulator() {
         </div>
 
         {/* Trade history */}
-        <div className="card border" style={{ borderColor:'var(--border)' }}>
+        <div className="card-flat">
           <div className="flex items-center gap-2 mb-4">
-            <Clock size={14} style={{ color:'var(--accent)' }}/>
             <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Trade History</span>
-            <span className="text-xs px-1.5 py-0.5 rounded-md font-medium ml-1"
-              style={{ background:'var(--bg-3)', color:'var(--text-3)' }}>{trades.length}</span>
+            <span className="text-xs px-1.5 py-0.5 rounded-md font-medium font-mono ml-1"
+              style={{ background:'var(--bg-3)', color:'var(--text-2)' }}>{trades.length}</span>
           </div>
           {trades.length === 0 ? (
-            <div className="text-center py-10" style={{ color:'var(--text-3)' }}>
-              <Clock size={28} className="mx-auto mb-2 opacity-20"/>
-              <p className="text-xs">No trades yet</p>
+            <div className="text-center py-10" style={{ color:'var(--text-2)' }}>
+              <p className="text-xs">No trades yet. Your buys and sells will be listed here.</p>
             </div>
           ) : (
             <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
               {trades.map(t => (
-                <div key={t.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 border"
+                <div key={t.id} className="flex items-center gap-3 rounded-lg px-3 py-2.5 border"
                   style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${t.type==='buy'?'bg-emerald-400/10':'bg-red-400/10'}`}>
+                  <div className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${t.type==='buy'?'bg-emerald-400/10':'bg-red-400/10'}`}>
                     {t.type === 'buy'
                       ? <ArrowDown size={12} className="text-emerald-400"/>
                       : <ArrowUp size={12} className="text-red-400"/>
@@ -761,7 +728,7 @@ export default function Simulator() {
                       <span className={`text-xs font-semibold capitalize ${t.type==='buy'?'text-emerald-400':'text-red-400'}`}>{t.type}</span>
                     </div>
                     <div className="text-xs" style={{ color:'var(--text-3)' }}>
-                      {t.shares} shares @ ${t.price.toFixed(2)} · {t.date}
+                      <span className="font-mono">{t.shares} shares @ ${t.price.toFixed(2)}</span> · {t.date}
                     </div>
                   </div>
                   <div className="text-xs font-mono font-semibold text-right shrink-0" style={{ color:'var(--text-2)' }}>

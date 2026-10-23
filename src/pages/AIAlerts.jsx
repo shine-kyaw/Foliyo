@@ -4,11 +4,16 @@ import { Link } from 'react-router-dom'
 import {
   Bell, Brain, TrendingUp, TrendingDown, Search, Plus, X,
   Pause, Play, Trash2, Mail, Monitor, BellOff, Activity,
-  Clock, Zap, AlertTriangle, CheckCircle, Minus, Target,
-  Shield, ChevronDown, ChevronUp, Filter,
+  Clock, AlertTriangle, Minus, Target,
+  Shield, ChevronDown, ChevronUp,
 } from 'lucide-react'
 import { stocks as allStocks, aiAlerts as mockSignals } from '../data/mockData'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
+import PageHeader, { StatusPill } from '../components/PageHeader'
+
+/* Segmented-control states, shared by every tab/chip group on this page */
+const SEG_ON  = { background:'rgba(var(--accent-rgb),.12)', color:'var(--text-1)', borderColor:'rgba(var(--accent-rgb),.25)' }
+const SEG_OFF = { background:'transparent', color:'var(--text-2)', borderColor:'var(--border)' }
 
 /* ── Persistence ─────────────────────────────────────────────── */
 const STORAGE_KEY = 'foliyo_user_alerts'
@@ -49,7 +54,7 @@ const ALERT_TYPES = [
   { key:'price_above',      label:'Price Above',  Icon:TrendingUp,   desc:'Notify when price exceeds a target' },
   { key:'price_below',      label:'Price Below',  Icon:TrendingDown, desc:'Notify when price drops below a target' },
   { key:'daily_move',       label:'Daily Move',   Icon:Activity,     desc:'Notify if daily movement exceeds X%' },
-  { key:'sentiment_change', label:'AI Sentiment', Icon:Brain,        desc:'Notify if AI verdict changes' },
+  { key:'sentiment_change', label:'Sentiment',    Icon:Brain,        desc:'Notify if the sentiment verdict changes' },
   { key:'news_event',       label:'Major News',   Icon:Bell,         desc:'Notify on significant news events' },
 ]
 const NOTIF_METHODS = [
@@ -65,7 +70,7 @@ function conditionLabel(a) {
     case 'price_above':      return `Price exceeds $${a.targetValue}`
     case 'price_below':      return `Price drops below $${a.targetValue}`
     case 'daily_move':       return `Daily move exceeds ±${a.targetValue}%`
-    case 'sentiment_change': return `AI sentiment changes to ${a.targetSentiment || 'Bullish'}`
+    case 'sentiment_change': return `Sentiment changes to ${a.targetSentiment || 'Bullish'}`
     case 'news_event':       return `Major news event for ${a.stock.symbol}`
     default: return 'Custom alert'
   }
@@ -93,19 +98,14 @@ function fmtDate(iso) {
 
 /* ── Status badge ────────────────────────────────────────────── */
 const STATUS_CFG = {
-  active:    { color:'#10b981', bg:'rgba(16,185,129,.1)',  border:'rgba(16,185,129,.2)',  label:'Active'    },
-  triggered: { color:'var(--accent)', bg:`rgba(var(--accent-rgb),.1)`, border:`rgba(var(--accent-rgb),.2)`, label:'Triggered' },
-  paused:    { color:'#6b7280', bg:'rgba(107,114,128,.1)', border:'rgba(107,114,128,.2)', label:'Paused'    },
+  active:    { tone:'live',   label:'Active'    },
+  triggered: { tone:'accent', label:'Triggered' },
+  paused:    { tone:'muted',  label:'Paused'    },
 }
 
 function StatusBadge({ status }) {
   const c = STATUS_CFG[status] || STATUS_CFG.active
-  return (
-    <span className="text-xs font-bold px-2.5 py-1 rounded-full"
-      style={{ color:c.color, background:c.bg, border:`1px solid ${c.border}` }}>
-      {c.label}
-    </span>
-  )
+  return <StatusPill tone={c.tone}>{c.label}</StatusPill>
 }
 
 /* ── Notif icon ──────────────────────────────────────────────── */
@@ -138,7 +138,7 @@ function StockSearchBox({ onSelect }) {
 
   return (
     <div className="relative">
-      <div className="relative flex items-center rounded-xl border overflow-hidden transition-all"
+      <div className="relative flex items-center rounded-lg border overflow-hidden transition-all"
         style={{
           background:'var(--bg-2)',
           borderColor: focused ? 'rgba(var(--accent-rgb),.5)' : 'var(--border)',
@@ -148,6 +148,7 @@ function StockSearchBox({ onSelect }) {
         <input
           className="flex-1 bg-transparent text-sm px-3 py-3 outline-none"
           style={{ color:'var(--text-1)' }}
+          aria-label="Search ticker or company"
           placeholder="Search ticker or company — e.g. AAPL, Tesla…"
           value={q}
           onChange={e => setQ(e.target.value)}
@@ -156,7 +157,7 @@ function StockSearchBox({ onSelect }) {
         />
         {q && (
           <button className="mr-3 opacity-50 hover:opacity-100 transition-opacity text-xs"
-            style={{ color:'var(--text-3)' }} onClick={() => setQ('')}>
+            style={{ color:'var(--text-3)' }} onClick={() => setQ('')} aria-label="Clear search">
             <X size={13}/>
           </button>
         )}
@@ -165,7 +166,7 @@ function StockSearchBox({ onSelect }) {
         {focused && results.length > 0 && (
           <motion.div
             initial={{ opacity:0, y:4 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:4 }}
-            className="absolute left-0 right-0 mt-1.5 rounded-xl border shadow-2xl overflow-hidden z-50"
+            className="absolute left-0 right-0 mt-1.5 rounded-lg border shadow-2xl overflow-hidden z-50"
             style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
             {results.map(s => (
               <button key={s.symbol} onMouseDown={() => pick(s)}
@@ -174,7 +175,7 @@ function StockSearchBox({ onSelect }) {
                 onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-3)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0"
+                  <div className="w-7 h-7 rounded-md flex items-center justify-center text-xs font-black shrink-0"
                     style={{ background:`rgba(var(--accent-rgb),.1)`, color:'var(--accent)' }}>
                     {s.symbol.charAt(0)}
                   </div>
@@ -187,7 +188,8 @@ function StockSearchBox({ onSelect }) {
                   <div className="text-sm font-mono font-semibold" style={{ color: s.price != null ? 'var(--text-1)' : 'var(--text-3)' }}>
                     {s.price != null ? `$${s.price.toFixed(2)}` : '—'}
                   </div>
-                  <div className={`text-xs font-bold ${s.changePct == null ? 'text-slate-500' : s.changePct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <div className={`text-xs font-bold font-mono ${s.changePct == null ? '' : s.changePct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+                    style={s.changePct == null ? { color:'var(--text-3)' } : undefined}>
                     {s.changePct != null ? `${s.changePct >= 0 ? '+' : ''}${s.changePct.toFixed(2)}%` : '—'}
                   </div>
                 </div>
@@ -242,13 +244,13 @@ function CreateAlertPanel({ stock, onSave, onCancel }) {
   return (
     <motion.div
       initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:8 }}
-      className="rounded-2xl border p-5 space-y-5"
+      className="rounded-xl border p-5 space-y-5"
       style={{ background:'var(--bg-2)', borderColor:`rgba(var(--accent-rgb),.25)` }}>
 
       {/* Stock header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm"
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center font-black text-sm"
             style={{ background:`rgba(var(--accent-rgb),.12)`, color:'var(--accent)' }}>
             {stock.symbol.charAt(0)}
           </div>
@@ -259,11 +261,11 @@ function CreateAlertPanel({ stock, onSave, onCancel }) {
         </div>
         <div className="text-right">
           <div className="font-mono font-bold" style={{ color:'var(--text-1)' }}>${stock.price.toFixed(2)}</div>
-          <div className={`text-xs font-bold ${stock.changePct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+          <div className={`text-xs font-bold font-mono ${stock.changePct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
             {stock.changePct >= 0 ? '+' : ''}{stock.changePct.toFixed(2)}% today
           </div>
         </div>
-        <button onClick={onCancel} className="ml-3 p-1.5 rounded-lg hover:bg-white/5 transition-colors"
+        <button onClick={onCancel} aria-label="Cancel" className="ml-3 p-1.5 rounded-lg hover:bg-white/5 transition-colors"
           style={{ color:'var(--text-3)' }}>
           <X size={15}/>
         </button>
@@ -275,12 +277,9 @@ function CreateAlertPanel({ stock, onSave, onCancel }) {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {ALERT_TYPES.map(t => (
             <button key={t.key} onClick={() => setAlertType(t.key)}
-              className="flex items-center gap-2 px-3 py-2.5 rounded-xl border text-left transition-all"
-              style={alertType === t.key
-                ? { background:`rgba(var(--accent-rgb),.1)`, borderColor:`rgba(var(--accent-rgb),.3)`, color:'var(--accent)' }
-                : { background:'var(--bg-1)', borderColor:'var(--border)', color:'var(--text-3)' }
-              }>
-              <t.Icon size={13}/>
+              className="flex items-center gap-2 px-3 py-2.5 rounded-lg border text-left transition-all"
+              style={alertType === t.key ? SEG_ON : SEG_OFF}>
+              <t.Icon size={13} style={alertType === t.key ? { color:'var(--accent)' } : undefined}/>
               <span className="text-xs font-semibold">{t.label}</span>
             </button>
           ))}
@@ -293,16 +292,16 @@ function CreateAlertPanel({ stock, onSave, onCancel }) {
       {/* Target value */}
       {needsValue && (
         <div>
-          <div className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color:'var(--text-3)' }}>
+          <label htmlFor="alert-target" className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color:'var(--text-3)' }}>
             {alertType === 'daily_move' ? 'Movement Threshold (%)' : 'Target Price ($)'}
-          </div>
+          </label>
           <div className="relative">
             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-sm"
               style={{ color:'var(--text-3)' }}>
               {alertType === 'daily_move' ? '±' : '$'}
             </span>
             <input
-              type="number" step="0.01" min="0"
+              id="alert-target" type="number" step="0.01" min="0"
               className="input text-sm pl-8 py-2.5 w-full font-mono"
               value={targetVal}
               onChange={e => setTargetVal(e.target.value)}
@@ -310,12 +309,12 @@ function CreateAlertPanel({ stock, onSave, onCancel }) {
             />
           </div>
           {alertType === 'price_above' && parseFloat(targetVal) > 0 && (
-            <p className="text-xs mt-1.5" style={{ color:'var(--text-3)' }}>
+            <p className="text-xs mt-1.5 font-mono" style={{ color:'var(--text-3)' }}>
               {((parseFloat(targetVal) - stock.price) / stock.price * 100).toFixed(1)}% above current price
             </p>
           )}
           {alertType === 'price_below' && parseFloat(targetVal) > 0 && (
-            <p className="text-xs mt-1.5" style={{ color:'var(--text-3)' }}>
+            <p className="text-xs mt-1.5 font-mono" style={{ color:'var(--text-3)' }}>
               {((stock.price - parseFloat(targetVal)) / stock.price * 100).toFixed(1)}% below current price
             </p>
           )}
@@ -329,12 +328,12 @@ function CreateAlertPanel({ stock, onSave, onCancel }) {
           <div className="flex gap-2">
             {['Bullish','Neutral','Bearish'].map(s => (
               <button key={s} onClick={() => setTargetSent(s)}
-                className="flex-1 py-2 rounded-xl text-xs font-bold border transition-all"
+                className="flex-1 py-2 rounded-lg text-xs font-bold border transition-all"
                 style={targetSent === s
-                  ? s === 'Bullish' ? { background:'rgba(16,185,129,.12)', borderColor:'rgba(16,185,129,.3)', color:'#10b981' }
-                    : s === 'Bearish' ? { background:'rgba(239,68,68,.12)', borderColor:'rgba(239,68,68,.3)', color:'#ef4444' }
-                    : { background:'rgba(245,158,11,.12)', borderColor:'rgba(245,158,11,.3)', color:'#f59e0b' }
-                  : { background:'var(--bg-1)', borderColor:'var(--border)', color:'var(--text-3)' }
+                  ? s === 'Bullish' ? { background:'rgb(var(--up) / .12)', borderColor:'rgb(var(--up) / .3)', color:'rgb(var(--up))' }
+                    : s === 'Bearish' ? { background:'rgb(var(--down) / .12)', borderColor:'rgb(var(--down) / .3)', color:'rgb(var(--down))' }
+                    : { background:'rgb(var(--caution) / .12)', borderColor:'rgb(var(--caution) / .3)', color:'rgb(var(--caution))' }
+                  : SEG_OFF
                 }>
                 {s}
               </button>
@@ -349,12 +348,9 @@ function CreateAlertPanel({ stock, onSave, onCancel }) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {NOTIF_METHODS.map(m => (
             <button key={m.key} onClick={() => setNotifMethod(m.key)}
-              className="flex flex-col items-center gap-1.5 px-2 py-3 rounded-xl border transition-all"
-              style={notifMethod === m.key
-                ? { background:`rgba(var(--accent-rgb),.1)`, borderColor:`rgba(var(--accent-rgb),.3)`, color:'var(--accent)' }
-                : { background:'var(--bg-1)', borderColor:'var(--border)', color:'var(--text-3)' }
-              }>
-              <m.Icon size={15}/>
+              className="flex flex-col items-center gap-1.5 px-2 py-3 rounded-lg border transition-all"
+              style={notifMethod === m.key ? SEG_ON : SEG_OFF}>
+              <m.Icon size={15} style={notifMethod === m.key ? { color:'var(--accent)' } : undefined}/>
               <span className="text-xs font-semibold text-center leading-tight">{m.label}</span>
             </button>
           ))}
@@ -384,12 +380,12 @@ function AlertCard({ alert, onPause, onDelete }) {
   return (
     <motion.div
       initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
-      className="card border" style={{ borderColor:'var(--border)' }}>
+      className="card-flat">
 
       {/* Top row */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shrink-0"
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center font-black text-sm shrink-0"
             style={{ background:`rgba(var(--accent-rgb),.1)`, color:'var(--accent)' }}>
             {alert.stock.symbol.charAt(0)}
           </div>
@@ -411,10 +407,11 @@ function AlertCard({ alert, onPause, onDelete }) {
           <button onClick={() => onPause(alert.id)}
             className="p-2 rounded-lg transition-all hover:bg-white/5"
             title={alert.status === 'paused' ? 'Resume' : 'Pause'}
+            aria-label={alert.status === 'paused' ? 'Resume alert' : 'Pause alert'}
             style={{ color:'var(--text-3)' }}>
             {alert.status === 'paused' ? <Play size={14}/> : <Pause size={14}/>}
           </button>
-          <button onClick={() => onDelete(alert.id)}
+          <button onClick={() => onDelete(alert.id)} aria-label="Delete alert"
             className="p-2 rounded-lg transition-all hover:bg-red-400/10"
             style={{ color:'var(--text-3)' }}>
             <Trash2 size={14}/>
@@ -423,7 +420,7 @@ function AlertCard({ alert, onPause, onDelete }) {
       </div>
 
       {/* Condition row */}
-      <div className="mt-3 rounded-xl p-3 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
+      <div className="mt-3 rounded-lg p-3 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
         <p className="text-sm font-medium" style={{ color:'var(--text-2)' }}>
           {conditionLabel(alert)}
         </p>
@@ -431,27 +428,27 @@ function AlertCard({ alert, onPause, onDelete }) {
 
       {/* Metrics strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
-        <div className="rounded-xl p-2.5 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
+        <div className="rounded-lg p-2.5 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
           <div className="text-xs mb-0.5" style={{ color:'var(--text-3)' }}>Current</div>
           <div className="text-sm font-mono font-bold" style={{ color:'var(--text-1)' }}>
             ${alert.stock.price.toFixed(2)}
           </div>
         </div>
         {(alert.type === 'price_above' || alert.type === 'price_below') && (
-          <div className="rounded-xl p-2.5 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
+          <div className="rounded-lg p-2.5 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
             <div className="text-xs mb-0.5" style={{ color:'var(--text-3)' }}>Target</div>
             <div className="text-sm font-mono font-bold" style={{ color:'var(--accent)' }}>
               ${alert.targetValue}
             </div>
           </div>
         )}
-        <div className="rounded-xl p-2.5 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
+        <div className="rounded-lg p-2.5 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
           <div className="text-xs mb-0.5" style={{ color:'var(--text-3)' }}>Distance</div>
-          <div className="text-sm font-semibold" style={{ color:'var(--text-2)' }}>
+          <div className="text-sm font-semibold font-mono" style={{ color:'var(--text-2)' }}>
             {distanceLabel(alert)}
           </div>
         </div>
-        <div className="rounded-xl p-2.5 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
+        <div className="rounded-lg p-2.5 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
           <div className="text-xs mb-0.5" style={{ color:'var(--text-3)' }}>Notify</div>
           <div className="flex items-center gap-1.5">
             <NotifIcon method={alert.notifMethod}/>
@@ -468,7 +465,7 @@ function AlertCard({ alert, onPause, onDelete }) {
         style={{ color:'var(--text-3)' }}>
         {expanded ? <ChevronUp size={12}/> : <ChevronDown size={12}/>}
         {expanded ? 'Less' : 'Details'}
-        <span className="ml-auto flex items-center gap-1">
+        <span className="ml-auto flex items-center gap-1 font-mono">
           <Clock size={10}/>
           Created {fmtDate(alert.createdAt)}
         </span>
@@ -500,10 +497,11 @@ function AISignalsTab() {
   const [expanded, setExpanded] = useState(null)
 
   const typeStyle = {
-    BUY:  { color:'#10b981', bg:'rgba(16,185,129,.1)',  border:'rgba(16,185,129,.2)',  Icon:TrendingUp   },
-    SELL: { color:'#ef4444', bg:'rgba(239,68,68,.1)',   border:'rgba(239,68,68,.2)',   Icon:TrendingDown  },
-    HOLD: { color:'#eab308', bg:'rgba(234,179,8,.1)',   border:'rgba(234,179,8,.2)',   Icon:Minus         },
+    BUY:  { color:'rgb(var(--up))',   bg:'rgb(var(--up) / .1)',      border:'rgb(var(--up) / .2)',      Icon:TrendingUp   },
+    SELL: { color:'rgb(var(--down))', bg:'rgb(var(--down) / .1)',    border:'rgb(var(--down) / .2)',    Icon:TrendingDown },
+    HOLD: { color:'rgb(var(--caution))',  bg:'rgb(var(--caution) / .1)', border:'rgb(var(--caution) / .2)', Icon:Minus        },
   }
+  const confColor = (c) => c >= 85 ? 'rgb(var(--up))' : c >= 70 ? 'var(--accent)' : 'rgb(var(--down))'
   const counts = {
     BUY:  mockSignals.filter(a => a.type==='BUY').length,
     SELL: mockSignals.filter(a => a.type==='SELL').length,
@@ -513,21 +511,25 @@ function AISignalsTab() {
 
   return (
     <div className="space-y-5">
+      <p className="text-sm" style={{ color:'var(--text-2)' }}>
+        Example signals for illustration. They are not generated from live market data.
+      </p>
+
       {/* Summary */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { type:'BUY',  label:'Buy Signals',  color:'#10b981', bg:'rgba(16,185,129,.08)', border:'rgba(16,185,129,.2)' },
-          { type:'SELL', label:'Sell Signals', color:'#ef4444', bg:'rgba(239,68,68,.08)',  border:'rgba(239,68,68,.2)'  },
-          { type:'HOLD', label:'Hold Signals', color:'#eab308', bg:'rgba(234,179,8,.08)',  border:'rgba(234,179,8,.2)'  },
+          { type:'BUY',  label:'Buy',  color:'rgb(var(--up))',   bg:'rgb(var(--up) / .08)',      border:'rgb(var(--up) / .2)'      },
+          { type:'SELL', label:'Sell', color:'rgb(var(--down))', bg:'rgb(var(--down) / .08)',    border:'rgb(var(--down) / .2)'    },
+          { type:'HOLD', label:'Hold', color:'rgb(var(--caution))',  bg:'rgb(var(--caution) / .08)', border:'rgb(var(--caution) / .2)' },
         ].map(s => (
-          <motion.button key={s.type} whileHover={{ scale:1.02 }} whileTap={{ scale:0.97 }}
+          <button key={s.type}
             onClick={() => setFilter(filter === s.type ? 'All' : s.type)}
-            className="rounded-2xl p-4 text-center border transition-all"
+            aria-pressed={filter === s.type}
+            className="rounded-xl p-4 text-center border transition-colors"
             style={{ background:filter===s.type?s.bg:'var(--bg-2)', borderColor:filter===s.type?s.border:'var(--border)' }}>
             <div className="text-3xl font-black font-mono" style={{ color:s.color }}>{counts[s.type]}</div>
             <div className="text-xs font-semibold mt-1" style={{ color:s.color }}>{s.label}</div>
-            <div className="text-xs mt-0.5" style={{ color:'var(--text-3)' }}>Today</div>
-          </motion.button>
+          </button>
         ))}
       </div>
 
@@ -535,11 +537,8 @@ function AISignalsTab() {
       <div className="flex gap-2">
         {['All','BUY','SELL','HOLD'].map(f => (
           <button key={f} onClick={() => setFilter(f)}
-            className="text-xs px-4 py-2 rounded-full font-bold border transition-all"
-            style={filter === f
-              ? { background:`rgba(var(--accent-rgb),.1)`, color:'var(--accent)', borderColor:`rgba(var(--accent-rgb),.25)` }
-              : { color:'var(--text-3)', borderColor:'var(--border)' }
-            }>
+            className="text-xs px-4 py-2 rounded-md font-bold border transition-all"
+            style={filter === f ? SEG_ON : SEG_OFF}>
             {f}{f !== 'All' && <span className="ml-1 opacity-60">{counts[f]}</span>}
           </button>
         ))}
@@ -550,14 +549,15 @@ function AISignalsTab() {
         {filtered.map((alert, i) => {
           const ts = typeStyle[alert.type]
           const isExp = expanded === alert.id
-          const upside = Math.abs(((alert.target - alert.price) / alert.price) * 100).toFixed(1)
+          const toTarget = ((alert.target - alert.price) / alert.price) * 100
+          const upside = Math.abs(toTarget).toFixed(1)
           return (
             <motion.div key={alert.id}
               initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }} transition={{ delay:i*0.07 }}
-              className="card border" style={{ borderColor:'var(--border)' }}>
+              className="card-flat">
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center font-black shrink-0"
+                  <div className="w-11 h-11 rounded-lg flex items-center justify-center font-black shrink-0"
                     style={{ background:ts.bg, color:ts.color, border:`1px solid ${ts.border}` }}>
                     {alert.symbol.charAt(0)}
                   </div>
@@ -566,11 +566,11 @@ function AISignalsTab() {
                       <Link to={`/stock/${alert.symbol}`}
                         className="font-black hover:text-accent transition-colors"
                         style={{ color:'var(--text-1)' }}>{alert.symbol}</Link>
-                      <span className="text-xs font-black px-2 py-0.5 rounded-full"
+                      <span className="text-xs font-black px-2 py-0.5 rounded-md"
                         style={{ background:ts.bg, color:ts.color, border:`1px solid ${ts.border}` }}>
                         <ts.Icon size={10} className="inline mr-0.5"/>{alert.type}
                       </span>
-                      <span className="text-xs flex items-center gap-1" style={{ color:'var(--text-3)' }}>
+                      <span className="text-xs flex items-center gap-1 font-mono" style={{ color:'var(--text-3)' }}>
                         <Clock size={9}/>{alert.timestamp}
                       </span>
                     </div>
@@ -586,10 +586,10 @@ function AISignalsTab() {
                     <div className="text-xs" style={{ color:'var(--text-3)' }}>Target</div>
                     <div className={`font-black font-mono text-sm ${alert.type==='SELL'?'text-red-400':'text-emerald-400'}`}>${alert.target.toFixed(2)}</div>
                   </div>
-                  <div className="rounded-xl px-3 py-2 text-center" style={{ background:ts.bg, border:`1px solid ${ts.border}` }}>
-                    <div className="text-xs" style={{ color:'var(--text-3)' }}>Upside</div>
+                  <div className="rounded-lg px-3 py-2 text-center" style={{ background:ts.bg, border:`1px solid ${ts.border}` }}>
+                    <div className="text-xs" style={{ color:'var(--text-3)' }}>To target</div>
                     <div className="font-black text-sm font-mono" style={{ color:ts.color }}>
-                      {alert.type==='BUY'?'+':'-'}{upside}%
+                      {toTarget >= 0 ? '+' : '-'}{upside}%
                     </div>
                   </div>
                 </div>
@@ -598,17 +598,17 @@ function AISignalsTab() {
               {/* Confidence */}
               <div className="mt-4">
                 <div className="flex justify-between mb-1.5 text-xs" style={{ color:'var(--text-3)' }}>
-                  <span>AI Confidence Score</span><span>{alert.timeframe}</span>
+                  <span>Confidence score</span><span className="font-mono">{alert.timeframe}</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="flex-1 rounded-full h-1.5 overflow-hidden" style={{ background:'var(--bg-3)' }}>
                     <motion.div className="h-1.5 rounded-full"
                       initial={{ width:0 }} animate={{ width:`${alert.confidence}%` }}
                       transition={{ duration:0.9, ease:[0.22,1,0.36,1] }}
-                      style={{ background: alert.confidence>=85?'#10b981':alert.confidence>=70?'#f59e0b':'#ef4444' }}/>
+                      style={{ background: confColor(alert.confidence) }}/>
                   </div>
                   <span className="text-xs font-black font-mono w-9 text-right"
-                    style={{ color:alert.confidence>=85?'#10b981':alert.confidence>=70?'#f59e0b':'#ef4444' }}>
+                    style={{ color: confColor(alert.confidence) }}>
                     {alert.confidence}%
                   </span>
                 </div>
@@ -629,20 +629,19 @@ function AISignalsTab() {
                 {isExp && (
                   <motion.div initial={{ height:0, opacity:0 }} animate={{ height:'auto', opacity:1 }} exit={{ height:0, opacity:0 }}>
                     <div className="mt-4 pt-4 border-t space-y-3" style={{ borderColor:'var(--border)' }}>
-                      <div className="rounded-xl p-4 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <Brain size={12} style={{ color:'var(--accent)' }}/>
-                          <span className="text-xs font-bold uppercase tracking-wider" style={{ color:'var(--accent)' }}>AI Reasoning</span>
+                      <div className="rounded-lg p-4 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
+                        <div className="mb-2">
+                          <span className="section-label">Rationale</span>
                         </div>
                         <p className="text-sm leading-relaxed" style={{ color:'var(--text-2)' }}>{alert.reasoning}</p>
                       </div>
                       <div className="grid grid-cols-3 gap-3">
                         {[
                           { label:'Entry', val:`$${alert.price.toFixed(2)}`,    color:'var(--accent)',  Icon:Target    },
-                          { label:'Target',val:`$${alert.target.toFixed(2)}`,   color:'#10b981',        Icon:TrendingUp },
-                          { label:'Stop',  val:`$${alert.stopLoss.toFixed(2)}`, color:'#ef4444',        Icon:Shield    },
+                          { label:'Target',val:`$${alert.target.toFixed(2)}`,   color:'rgb(var(--up))',          Icon:TrendingUp },
+                          { label:'Stop',  val:`$${alert.stopLoss.toFixed(2)}`, color:'rgb(var(--down))',        Icon:Shield    },
                         ].map(l => (
-                          <div key={l.label} className="rounded-xl p-3 border text-center"
+                          <div key={l.label} className="rounded-lg p-3 border text-center"
                             style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
                             <div className="flex items-center justify-center gap-1 mb-1">
                               <l.Icon size={10} style={{ color:l.color }}/>
@@ -697,7 +696,7 @@ export default function AIAlerts() {
     { key:'triggered', label:'Triggered' },
     { key:'paused',    label:'Paused' },
     { key:'price',     label:'Price Alerts' },
-    { key:'sentiment', label:'AI Sentiment' },
+    { key:'sentiment', label:'Sentiment' },
     { key:'news',      label:'News' },
   ]
 
@@ -718,43 +717,23 @@ export default function AIAlerts() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6 page-enter">
 
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-black flex items-center gap-2.5" style={{ color:'var(--text-1)' }}>
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background:'linear-gradient(135deg, var(--accent), #8b5cf6)' }}>
-              <Brain size={16} className="text-white"/>
-            </div>
-            AI Alerts
-          </h1>
-          <p className="text-sm mt-0.5" style={{ color:'var(--text-3)' }}>
-            Personalized alerts + AI-generated market signals
-          </p>
-        </div>
-        <div className="flex items-center gap-2 rounded-full px-4 py-1.5"
-          style={{ background:`rgba(var(--accent-rgb),.1)`, border:`1px solid rgba(var(--accent-rgb),.2)` }}>
-          <Zap size={11} style={{ color:'var(--accent)' }}/>
-          <span className="text-xs font-semibold" style={{ color:'var(--accent)' }}>AI Engine Active</span>
-          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background:'var(--accent)' }}/>
-        </div>
-      </div>
+      <PageHeader title="AI Alerts"
+        subtitle="Set price, move and sentiment alerts on any stock, and browse example buy, sell and hold signals.">
+        <StatusPill tone="muted">{activeCnt} active</StatusPill>
+      </PageHeader>
 
       {/* Tab bar */}
-      <div className="flex gap-1 p-1 rounded-xl w-fit border"
+      <div className="flex gap-1 p-1 rounded-lg w-fit border"
         style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
         {[
           { key:'my-alerts', label:'My Alerts', badge: alerts.length },
-          { key:'ai-signals', label:'AI Signals', badge: mockSignals.length },
+          { key:'ai-signals', label:'Signals', badge: mockSignals.length },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all"
-            style={tab === t.key
-              ? { background:`rgba(var(--accent-rgb),.12)`, color:'var(--accent)', border:`1px solid rgba(var(--accent-rgb),.2)` }
-              : { color:'var(--text-3)', border:'1px solid transparent' }
-            }>
+            className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold border transition-all"
+            style={tab === t.key ? SEG_ON : { ...SEG_OFF, borderColor:'transparent' }}>
             {t.label}
-            <span className="text-xs px-1.5 py-0.5 rounded-full font-bold"
+            <span className="text-xs px-1.5 py-0.5 rounded font-bold font-mono"
               style={{ background:'var(--bg-3)', color:'var(--text-3)' }}>
               {t.badge}
             </span>
@@ -767,7 +746,7 @@ export default function AIAlerts() {
         <div className="space-y-5">
 
           {/* Create section */}
-          <div className="card border space-y-4" style={{ borderColor:'var(--border)' }}>
+          <div className="card-flat space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Plus size={14} style={{ color:'var(--accent)' }}/>
@@ -790,11 +769,11 @@ export default function AIAlerts() {
           {/* Stats */}
           <div className="grid grid-cols-3 gap-3">
             {[
-              { label:'Active',    count:activeCnt,    color:'#10b981', bg:'rgba(16,185,129,.08)',  border:'rgba(16,185,129,.18)' },
-              { label:'Paused',    count:pausedCnt,    color:'#6b7280', bg:'rgba(107,114,128,.08)', border:'rgba(107,114,128,.18)' },
+              { label:'Active',    count:activeCnt,    color:'rgb(var(--up))', bg:'rgb(var(--up) / .08)', border:'rgb(var(--up) / .18)' },
+              { label:'Paused',    count:pausedCnt,    color:'var(--text-2)', bg:'var(--bg-2)', border:'var(--border)' },
               { label:'Triggered', count:triggeredCnt, color:'var(--accent)', bg:`rgba(var(--accent-rgb),.08)`, border:`rgba(var(--accent-rgb),.18)` },
             ].map(s => (
-              <div key={s.label} className="rounded-2xl p-4 border text-center"
+              <div key={s.label} className="rounded-xl p-4 border text-center"
                 style={{ background:s.bg, borderColor:s.border }}>
                 <div className="text-3xl font-black font-mono" style={{ color:s.color }}>{s.count}</div>
                 <div className="text-xs font-semibold mt-1" style={{ color:s.color }}>{s.label}</div>
@@ -806,11 +785,8 @@ export default function AIAlerts() {
           <div className="flex gap-1.5 flex-wrap">
             {FILTERS.map(f => (
               <button key={f.key} onClick={() => setAlertFilter(f.key)}
-                className="text-xs px-3.5 py-1.5 rounded-full font-semibold border transition-all"
-                style={alertFilter === f.key
-                  ? { background:`rgba(var(--accent-rgb),.1)`, color:'var(--accent)', borderColor:`rgba(var(--accent-rgb),.25)` }
-                  : { color:'var(--text-3)', borderColor:'var(--border)' }
-                }>
+                className="text-xs px-3.5 py-1.5 rounded-md font-semibold border transition-all"
+                style={alertFilter === f.key ? SEG_ON : SEG_OFF}>
                 {f.label}
               </button>
             ))}
@@ -826,9 +802,11 @@ export default function AIAlerts() {
             {visibleAlerts.length === 0 && (
               <div className="text-center py-16" style={{ color:'var(--text-3)' }}>
                 <Bell size={36} className="mx-auto mb-3 opacity-20"/>
-                <p className="text-sm font-medium" style={{ color:'var(--text-2)' }}>No alerts</p>
+                <p className="text-sm font-medium" style={{ color:'var(--text-2)' }}>
+                  {alertFilter === 'all' ? 'No alerts yet' : `No ${FILTERS.find(f => f.key === alertFilter)?.label.toLowerCase()} alerts`}
+                </p>
                 <p className="text-xs mt-1">
-                  {alertFilter === 'all' ? 'Search for a stock above to create your first alert' : `No ${alertFilter} alerts`}
+                  {alertFilter === 'all' ? 'Search for a stock above to set your first alert.' : 'Pick another filter, or search for a stock above to add one.'}
                 </p>
               </div>
             )}
@@ -842,8 +820,8 @@ export default function AIAlerts() {
       {/* Disclaimer */}
       <div className="rounded-xl p-4 border text-xs" style={{ background:'var(--bg-2)', borderColor:'var(--border)', color:'var(--text-3)' }}>
         <AlertTriangle size={11} className="inline mr-1.5" style={{ color:'var(--text-3)' }}/>
-        <span className="font-semibold" style={{ color:'var(--text-2)' }}>Disclaimer:</span>{' '}
-        Alerts are informational and may be delayed depending on market data availability. Not financial advice.
+        <span className="font-semibold" style={{ color:'var(--text-2)' }}>Not financial advice.</span>{' '}
+        Alerts are saved in this browser only and are not checked against live prices. Signals are examples, not recommendations.
       </div>
     </div>
   )

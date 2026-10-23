@@ -1,4 +1,9 @@
 /** @type {import('tailwindcss').Config} */
+
+/* Market colours read from CSS variables (space-separated RGB) so they
+ * shift with the theme and still support Tailwind's /alpha modifiers. */
+const v = name => `rgb(var(${name}) / <alpha-value>)`
+
 export default {
   content: [
     "./index.html",
@@ -7,33 +12,26 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: {
-          primary: '#080b14',
-          secondary: '#0d1120',
-          card: '#111827',
-          border: '#1e2d45',
-        },
-        cyan: {
-          400: '#22d3ee',
-          500: '#06b6d4',
-          600: '#0891b2',
-        },
-        accent: {
-          blue: '#3b82f6',
-          purple: '#8b5cf6',
-          cyan: '#06b6d4',
-        }
+        // Brand — taken from the Foliyo mark
+        ink:      '#16171b',
+        cream:    '#f5f0e6',
+        marigold: '#e8a43e',
+        steel:    '#5a8ca0',
+        harbor:   '#2e4a57',
+
+        // Up / down / caution, retuned to sit with the brand palette
+        emerald: { 300: v('--up-soft'),   400: v('--up'),   500: v('--up')   },
+        red:     { 300: v('--down-soft'), 400: v('--down'), 500: v('--down') },
+        yellow:  { 400: v('--caution') },
+
+        // Neutrals warmed to match cream text on charcoal
+        slate: { 400: '#a49d90', 500: '#7f796e', 700: '#3a3833', 800: '#26252a' },
+        gray:  { 300: '#cfc8ba', 400: '#a49d90' },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
-      },
-      backgroundImage: {
-        'grid-pattern': "linear-gradient(rgba(6,182,212,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(6,182,212,0.03) 1px, transparent 1px)",
-        'hero-glow': 'radial-gradient(ellipse 80% 60% at 50% -20%, rgba(6,182,212,0.15), transparent)',
-      },
-      backgroundSize: {
-        'grid': '40px 40px',
+        sans:    ['Archivo', 'system-ui', 'sans-serif'],
+        display: ['Archivo', 'system-ui', 'sans-serif'],
+        mono:    ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
       },
       animation: {
         'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',

@@ -1,32 +1,30 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-  Globe2, TrendingUp, TrendingDown, AlertTriangle, RefreshCw,
-  ExternalLink, Wifi, WifiOff, Clock, Loader2, BarChart2,
-} from 'lucide-react'
+import { TrendingUp, TrendingDown, AlertTriangle, RefreshCw, Clock, Loader2 } from 'lucide-react'
 import { usStocks, euStocks, asiaStocks, commodities, currencies, cryptos } from '../data/mockData'
 import { ysxStocks, ysxMarketStats } from '../data/myanmarStocks'
 import { api } from '../services/api'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
 import { fmtPrice as fmtPriceLive, fmtPct, fmtChange, changeColor } from '../utils/formatLive'
+import PageHeader, { StatusPill } from '../components/PageHeader'
 
 /* ── Shared helpers ──────────────────────────────────────────── */
 const fmtNum = (n, dec = 2) => (typeof n === 'number' ? n.toFixed(dec) : '—')
 const fmtPrice = (n, dec = 2) => (typeof n === 'number' ? n.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }) : '—')
 
-function StatusBadge({ status, isLive, lastUpdated }) {
+function StatusBadge({ status, isLive }) {
   if (isLive === true || status === 'live')
-    return <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-      style={{ background:'rgba(16,185,129,.1)', color:'#10b981', border:'1px solid rgba(16,185,129,.2)' }}>
-      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"/>Live
+    return <span className="flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded"
+      style={{ background:'rgb(var(--up) / .1)', color:'rgb(var(--up))', border:'1px solid rgb(var(--up) / .2)' }}>
+      <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background:'rgb(var(--up))' }}/>Live
     </span>
   if (status === 'latest_available')
-    return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-      style={{ background:'rgba(245,158,11,.08)', color:'#f59e0b', border:'1px solid rgba(245,158,11,.2)' }}>Latest</span>
+    return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+      style={{ background:'rgb(var(--caution) / .08)', color:'rgb(var(--caution))', border:'1px solid rgb(var(--caution) / .2)' }}>Latest</span>
   if (status === 'mock' || isLive === false)
-    return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
-      style={{ background:'rgba(148,163,184,.08)', color:'#94a3b8', border:'1px solid rgba(148,163,184,.15)' }}>Ref</span>
+    return <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+      style={{ background:'var(--bg-3)', color:'var(--text-3)', border:'1px solid var(--border)' }}>Ref</span>
   return null
 }
 
@@ -36,7 +34,7 @@ function ChangeCell({ change, changePct }) {
   return (
     <div className={`text-right ${up ? 'text-emerald-400' : 'text-red-400'}`}>
       <div className="font-bold text-sm font-mono">{up ? '+' : ''}{fmtNum(changePct)}%</div>
-      {change != null && <div className="text-xs opacity-70">{up ? '+' : ''}{fmtNum(change)}</div>}
+      {change != null && <div className="text-xs font-mono opacity-70">{up ? '+' : ''}{fmtNum(change)}</div>}
     </div>
   )
 }
@@ -47,7 +45,7 @@ function AssetCard({ asset, priceDecimals = 2 }) {
   const unavailable = asset.status === 'unavailable' || asset.price == null
   return (
     <motion.div initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }}
-      className="rounded-2xl border p-4 flex flex-col gap-2"
+      className="rounded-xl border p-4 flex flex-col gap-2"
       style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
       <div className="flex items-start justify-between gap-2">
         <div>
@@ -83,8 +81,8 @@ function StockRow({ stock, i }) {
       className="border-b" style={{ borderColor:'var(--border)' }}>
       <td className="td">
         <Link to={`/stock/${stock.symbol}`} className="flex items-center gap-2.5 group">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0"
-            style={{ background:`rgba(var(--accent-rgb),.1)`, color:'var(--accent)' }}>
+          <div className="w-7 h-7 rounded-md flex items-center justify-center text-xs font-black shrink-0"
+            style={{ background:'rgba(var(--accent-rgb),.1)', color:'var(--accent)' }}>
             {stock.symbol.charAt(0)}
           </div>
           <div>
@@ -103,7 +101,7 @@ function StockRow({ stock, i }) {
           {fmtPct(stock.changePct)}
         </div>
         {stock.change != null && (
-          <div className={`text-xs ${stock.change >= 0 ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
+          <div className={`text-xs font-mono ${stock.change >= 0 ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
             {fmtChange(stock.change)}
           </div>
         )}
@@ -115,7 +113,7 @@ function StockRow({ stock, i }) {
         <span className="text-sm font-mono font-semibold" style={{ color:'var(--text-1)' }}>{stock.mktCap}</span>
       </td>
       <td className="td text-right hidden lg:table-cell">
-        <span className="text-xs px-2 py-0.5 rounded-lg" style={{ background:'var(--bg-3)', color:'var(--text-3)' }}>
+        <span className="text-xs px-2 py-0.5 rounded-md" style={{ background:'var(--bg-3)', color:'var(--text-3)' }}>
           {stock.sector}
         </span>
       </td>
@@ -151,20 +149,11 @@ function StockTab({ stocks: data, region }) {
             {data.length} securities · {liveCount} live · {data.length - liveCount} reference
           </div>
         </div>
-        {liveCount > 0 ? (
-          <span className="text-[10px] font-bold px-2 py-1 rounded-full"
-            style={{ background:'rgba(16,185,129,.1)', color:'#10b981', border:'1px solid rgba(16,185,129,.2)' }}>
-            <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse inline-block mr-1.5"/>
-            Live · Finnhub
-          </span>
-        ) : (
-          <span className="text-[10px] font-bold px-2 py-1 rounded-full"
-            style={{ background:'rgba(148,163,184,.08)', color:'#94a3b8', border:'1px solid rgba(148,163,184,.15)' }}>
-            <WifiOff size={9} className="inline mr-1"/>Reference Data
-          </span>
-        )}
+        {liveCount > 0
+          ? <StatusPill tone="live" pulse>Live · Finnhub</StatusPill>
+          : <StatusPill tone="muted">Reference data</StatusPill>}
       </div>
-      <div className="rounded-2xl border overflow-hidden" style={{ borderColor:'var(--border)' }}>
+      <div className="rounded-xl border overflow-hidden" style={{ borderColor:'var(--border)' }}>
         <table className="w-full">
           <thead>
             <tr className="border-b" style={{ borderColor:'var(--border)', background:'var(--bg-2)' }}>
@@ -216,25 +205,23 @@ function LiveAssetTab({ fetcher, mockFallback, priceDecimals = 2, label, note, t
         </div>
         <div className="flex items-center gap-2">
           {isLive
-            ? <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full"
-                style={{ background:'rgba(16,185,129,.1)', color:'#10b981', border:'1px solid rgba(16,185,129,.2)' }}>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"/>Live · Twelve Data
-              </span>
-            : <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full"
-                style={{ background:'rgba(148,163,184,.08)', color:'#94a3b8', border:'1px solid rgba(148,163,184,.15)' }}>
-                <WifiOff size={10}/>Reference Data
-              </span>
-          }
-          <button onClick={load} disabled={loading}
-            className="p-1.5 rounded-lg border transition-all hover:opacity-80"
+            ? <StatusPill tone="live" pulse>Live · Twelve Data</StatusPill>
+            : <StatusPill tone="muted">Reference data</StatusPill>}
+          <button onClick={load} disabled={loading} aria-label="Refresh prices"
+            className="p-1.5 rounded-md border transition-all hover:opacity-80"
             style={{ borderColor:'var(--border)', color:'var(--text-3)' }}>
             <RefreshCw size={12} className={loading ? 'animate-spin' : ''}/>
           </button>
         </div>
       </div>
+      {!loading && assets && !isLive && (
+        <p className="text-xs mb-3" style={{ color:'var(--text-3)' }}>
+          Showing reference values, not live prices. Refresh to try again.
+        </p>
+      )}
       {loading && !assets ? (
         <div className="flex items-center justify-center py-20" style={{ color:'var(--text-3)' }}>
-          <Loader2 size={20} className="animate-spin mr-2"/><span className="text-sm">Fetching prices…</span>
+          <Loader2 size={20} className="animate-spin mr-2"/><span className="text-sm">Loading prices</span>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
@@ -245,7 +232,7 @@ function LiveAssetTab({ fetcher, mockFallback, priceDecimals = 2, label, note, t
       )}
       {lastFetched && (
         <div className="mt-3 text-xs flex items-center gap-1" style={{ color:'var(--text-3)' }}>
-          <Clock size={10}/>Last updated: {lastFetched.toLocaleTimeString()}
+          <Clock size={10}/>Last updated <span className="font-mono">{lastFetched.toLocaleTimeString()}</span>
         </div>
       )}
     </div>
@@ -254,15 +241,15 @@ function LiveAssetTab({ fetcher, mockFallback, priceDecimals = 2, label, note, t
 
 /* ── Tab: Myanmar / YSX ──────────────────────────────────────── */
 const SECTOR_COLORS = {
-  'Diversified':      '#8b5cf6','Industrials':'#3b82f6','Financials':'#10b981',
-  'Communication':    '#06b6d4','Consumer Staples':'#f59e0b',
+  'Diversified':      '#c98a6b','Industrials':'#6fa3b8','Financials':'#8fb38a',
+  'Communication':    '#e8a43e','Consumer Staples':'#d8c7a6',
 }
 function MyanmarTab() {
   return (
     <div>
       {/* Disclaimer banner */}
-      <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl border text-xs mb-5"
-        style={{ background:'rgba(245,158,11,.06)', borderColor:'rgba(245,158,11,.2)', color:'#f59e0b' }}>
+      <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg border text-xs mb-5"
+        style={{ background:'rgb(var(--caution) / .06)', borderColor:'rgb(var(--caution) / .2)', color:'rgb(var(--caution))' }}>
         <AlertTriangle size={13} className="shrink-0 mt-0.5"/>
         <span>
           YSX data may be delayed or limited. Prices are based on latest available YSX publications — not real-time.
@@ -274,16 +261,16 @@ function MyanmarTab() {
       {/* Market stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
         {[
-          { label:'Listed Companies', value:ysxMarketStats.totalListings, sub:'all sectors' },
+          { label:'Listed companies', value:ysxMarketStats.totalListings, sub:'all sectors' },
           { label:'Market Index (MMI)', value:ysxMarketStats.indexValue, sub:ysxMarketStats.indexChange },
-          { label:'Market Cap', value:ysxMarketStats.totalMktCap, sub:'approx.' },
-          { label:'Trading Hours', value:'09:30 – 12:30', sub:'ICT (UTC+6:30)' },
+          { label:'Market cap', value:ysxMarketStats.totalMktCap, sub:'approx.' },
+          { label:'Trading hours', value:'09:30 – 12:30', sub:'MMT (UTC+6:30)' },
         ].map(c => (
           <div key={c.label} className="rounded-xl border px-4 py-3"
             style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
             <div className="text-xs" style={{ color:'var(--text-3)' }}>{c.label}</div>
-            <div className="font-black text-base mt-0.5" style={{ color:'var(--text-1)' }}>{c.value}</div>
-            <div className="text-xs" style={{ color:'#10b981' }}>{c.sub}</div>
+            <div className="font-black font-mono text-base mt-0.5" style={{ color:'var(--text-1)' }}>{c.value}</div>
+            <div className="text-xs font-mono" style={{ color: c.sub === ysxMarketStats.indexChange ? (String(c.sub).trim().startsWith('-') ? 'rgb(var(--down))' : 'rgb(var(--up))') : 'var(--text-3)' }}>{c.sub}</div>
           </div>
         ))}
       </div>
@@ -292,43 +279,43 @@ function MyanmarTab() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {ysxStocks.map((stock, i) => {
           const up = stock.changePct >= 0
-          const sectorColor = SECTOR_COLORS[stock.sector] || '#94a3b8'
+          const sectorColor = SECTOR_COLORS[stock.sector] || '#857f73'
           return (
             <motion.div key={stock.code} initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} transition={{ delay: i * 0.05 }}>
               <Link to={`/myanmar-stocks/${stock.code}`}
-                className="block rounded-2xl border p-4 transition-all"
+                className="block rounded-xl border p-4 transition-colors"
                 style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}
                 onMouseEnter={e => e.currentTarget.style.borderColor = `rgba(var(--accent-rgb),.4)`}
                 onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
                 <div className="flex items-start justify-between gap-2 mb-3">
                   <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black shrink-0"
+                    <div className="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-black shrink-0"
                       style={{ background:`rgba(var(--accent-rgb),.1)`, color:'var(--accent)' }}>
                       {stock.code.charAt(0)}
                     </div>
                     <div>
                       <div className="flex items-center gap-1.5">
                         <span className="font-black text-sm" style={{ color:'var(--text-1)' }}>{stock.code}</span>
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
                           style={{ background:`${sectorColor}18`, color: sectorColor }}>{stock.sector}</span>
                       </div>
                       <div className="text-xs mt-0.5" style={{ color:'var(--text-3)' }}>{stock.shortName}</div>
                     </div>
                   </div>
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0"
-                    style={{ background:'rgba(245,158,11,.08)', color:'#f59e0b', border:'1px solid rgba(245,158,11,.2)' }}>
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0"
+                    style={{ background:'rgba(var(--accent-rgb),.08)', color:'var(--accent)', border:'1px solid rgba(var(--accent-rgb),.2)' }}>
                     YSX
                   </span>
                 </div>
                 <div className="font-black font-mono text-base" style={{ color:'var(--text-1)' }}>
                   {stock.price.toLocaleString()} MMK
                 </div>
-                <div className="text-xs text-gray-400 font-mono mb-2">≈ ${stock.priceUSD.toFixed(2)} USD</div>
-                <div className={`text-sm font-bold flex items-center gap-1 ${up ? 'text-emerald-400' : 'text-red-400'}`}>
+                <div className="text-xs font-mono mb-2" style={{ color:'var(--text-3)' }}>≈ ${stock.priceUSD.toFixed(2)} USD</div>
+                <div className={`text-sm font-bold font-mono flex items-center gap-1 ${up ? 'text-emerald-400' : 'text-red-400'}`}>
                   {up ? <TrendingUp size={12}/> : <TrendingDown size={12}/>}
                   {up ? '+' : ''}{stock.changePct.toFixed(2)}%
                 </div>
-                <div className="mt-2 text-xs" style={{ color:'var(--text-3)' }}>
+                <div className="mt-2 text-xs font-mono" style={{ color:'var(--text-3)' }}>
                   Vol: {stock.volume.toLocaleString()} · Cap: {stock.mktCap}
                 </div>
               </Link>
@@ -369,32 +356,22 @@ export default function GlobalMarkets() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 page-enter">
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-black flex items-center gap-2.5" style={{ color:'var(--text-1)' }}>
-            <Globe2 size={22} style={{ color:'var(--accent)' }}/>
-            Global Markets
-          </h1>
-          <p className="text-sm mt-1" style={{ color:'var(--text-3)' }}>
-            Equities, commodities, crypto, and forex — live and latest available data
-          </p>
-        </div>
-        <div className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full shrink-0"
-          style={{ color:'#10b981', background:'rgba(16,185,129,.08)', border:'1px solid rgba(16,185,129,.18)' }}>
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"/>
-          {new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })} UTC
-        </div>
-      </div>
+      <PageHeader className="mb-6" title="Global markets"
+        subtitle="Equities, commodities, crypto and forex by region. Each board shows whether its prices are live or reference values.">
+        <StatusPill tone="muted">
+          <span className="font-mono">{new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', timeZone:'UTC' })}</span> UTC
+        </StatusPill>
+      </PageHeader>
 
       {/* Tab bar */}
-      <div className="flex gap-1 flex-wrap mb-6 p-1 rounded-2xl border overflow-x-auto"
+      <div className="flex gap-1 flex-wrap mb-6 p-1 rounded-lg border overflow-x-auto"
         style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
         {TABS.map(t => (
           <button key={t.key} onClick={() => setRegion(t.key)}
-            className="text-sm px-3 py-2 rounded-xl font-semibold transition-all whitespace-nowrap"
+            className="text-sm px-3 py-2 rounded-md font-semibold transition-colors whitespace-nowrap"
             style={region === t.key
-              ? { background:`rgba(var(--accent-rgb),.15)`, color:'var(--accent)', border:`1px solid rgba(var(--accent-rgb),.25)` }
-              : { color:'var(--text-2)', border:'1px solid transparent' }
+              ? { background:'rgba(var(--accent-rgb),.12)', color:'var(--text-1)', border:'1px solid rgba(var(--accent-rgb),.25)' }
+              : { background:'transparent', color:'var(--text-2)', border:'1px solid transparent' }
             }>{t.label}</button>
         ))}
       </div>
@@ -412,7 +389,7 @@ export default function GlobalMarkets() {
               mockFallback={mockCommodities}
               priceDecimals={2}
               label="Commodities"
-              note="Gold, silver, crude oil, natural gas, copper — prices via Twelve Data"
+              note="Gold, silver, crude oil, natural gas and copper, priced via Twelve Data"
             />
           )}
           {region === 'crypto'      && (
@@ -421,7 +398,7 @@ export default function GlobalMarkets() {
               mockFallback={mockCrypto}
               priceDecimals={2}
               label="Cryptocurrency"
-              note="BTC, ETH, SOL, BNB, XRP, DOGE — prices via Twelve Data"
+              note="BTC, ETH, SOL, BNB, XRP and DOGE, priced via Twelve Data"
             />
           )}
           {region === 'forex'       && (
@@ -429,8 +406,8 @@ export default function GlobalMarkets() {
               fetcher={api.forex}
               mockFallback={mockForex}
               priceDecimals={4}
-              label="Foreign Exchange"
-              note="Major currency pairs — rates via Twelve Data"
+              label="Foreign exchange"
+              note="Major currency pairs, with rates via Twelve Data"
             />
           )}
         </motion.div>

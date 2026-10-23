@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  ArrowLeft, TrendingUp, TrendingDown, Star, GitCompare,
+  ArrowLeft, TrendingDown, Star, GitCompare,
   Activity, BarChart2, Newspaper, Brain, AlertTriangle, CheckCircle, Minus,
-  RefreshCw, WifiOff, Clock, Database,
+  RefreshCw, WifiOff, Clock, Database, ArrowUpRight, ArrowUpToLine, Zap,
 } from 'lucide-react'
 import { stocks, newsArticles } from '../data/mockData'
 import { generateAIAnalysis } from '../utils/aiAnalysis'
@@ -13,20 +13,22 @@ import { useCompanyNews } from '../hooks/useMarketNews'
 import { useChart } from '../hooks/useChart'
 import { useFundamentals } from '../hooks/useFundamentals'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
+import { StatusPill } from '../components/PageHeader'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, BarChart, Bar,
 } from 'recharts'
 
 const RANGES = ['1D','5D','1M','6M','1Y','5Y','All']
+const MONO_TICK = { fontSize:11, fill:'var(--text-3)', fontFamily:"'IBM Plex Mono', monospace" }
 
 /* ── Chart tooltip ─────────────────────────────────────────── */
 const ChartTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-xl px-3 py-2 text-xs border shadow-lg"
+    <div className="rounded-lg px-3 py-2 text-xs border shadow-lg"
       style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
-      <p style={{ color:'var(--text-3)' }}>{label}</p>
+      <p className="font-mono" style={{ color:'var(--text-3)' }}>{label}</p>
       <p className="font-bold font-mono" style={{ color:'var(--text-1)' }}>
         ${payload[0]?.value?.toFixed(2)}
       </p>
@@ -41,16 +43,18 @@ const Skeleton = ({ h = 'h-4', w = 'w-full', className = '' }) => (
 )
 
 /* ── AI verdict badge ──────────────────────────────────────── */
+const VERDICT = {
+  Bullish: { icon: CheckCircle,   rgb:'var(--up)'      },
+  Bearish: { icon: AlertTriangle, rgb:'var(--down)'    },
+  Neutral: { icon: Minus,         rgb:'var(--caution)' },
+}
+
 const VerdictBadge = ({ verdict }) => {
-  const cfg = {
-    Bullish: { icon: CheckCircle,    color:'#10b981', bg:'rgba(16,185,129,.1)',  border:'rgba(16,185,129,.2)'  },
-    Bearish: { icon: AlertTriangle,  color:'#ef4444', bg:'rgba(239,68,68,.1)',   border:'rgba(239,68,68,.2)'   },
-    Neutral: { icon: Minus,          color:'#f59e0b', bg:'rgba(245,158,11,.1)',  border:'rgba(245,158,11,.2)'  },
-  }[verdict] || {}
+  const cfg = VERDICT[verdict] || VERDICT.Neutral
   const Icon = cfg.icon
   return (
-    <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full"
-      style={{ color:cfg.color, background:cfg.bg, border:`1px solid ${cfg.border}` }}>
+    <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-md"
+      style={{ color:`rgb(${cfg.rgb})`, background:`rgb(${cfg.rgb} / .1)`, border:`1px solid rgb(${cfg.rgb} / .2)` }}>
       <Icon size={11}/> {verdict}
     </span>
   )
@@ -61,36 +65,36 @@ function AIAnalysisCard({ stock }) {
   const ai = generateAIAnalysis(stock)
   if (!ai) return null
   const { verdict, summary, reasons, risks, techSummary, fundSummary, newsImpact } = ai
-  const accentColor = verdict === 'Bullish' ? '#10b981' : verdict === 'Bearish' ? '#ef4444' : '#f59e0b'
+  const verdictRgb = (VERDICT[verdict] || VERDICT.Neutral).rgb
 
   return (
     <motion.div
       initial={{ opacity:0, y:16 }} whileInView={{ opacity:1, y:0 }}
       viewport={{ once:true }} transition={{ duration:0.4 }}
-      className="card border space-y-5" style={{ borderColor:'var(--border)' }}>
+      className="card-flat space-y-5">
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <Brain size={16} style={{ color:'var(--accent)' }}/>
           <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>AI Analysis</span>
-          <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+          <span className="text-xs px-2 py-0.5 rounded-md font-medium"
             style={{ background:`rgba(var(--accent-rgb),.08)`, color:'var(--accent)', border:`1px solid rgba(var(--accent-rgb),.15)` }}>
-            Powered by Foliyo AI
+            Rule-based
           </span>
         </div>
         <VerdictBadge verdict={verdict}/>
       </div>
 
       {/* Verdict bar */}
-      <div className="rounded-xl p-4 border" style={{ background:'var(--bg-1)', borderColor:`${accentColor}22` }}>
+      <div className="rounded-lg p-4 border" style={{ background:'var(--bg-1)', borderColor:`rgb(${verdictRgb} / .18)` }}>
         <p className="text-sm leading-relaxed" style={{ color:'var(--text-2)' }}>{summary}</p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Reasons */}
         <div>
-          <div className="text-xs font-bold uppercase tracking-wider mb-2.5" style={{ color:'#10b981' }}>
+          <div className="text-xs font-bold uppercase tracking-wider mb-2.5" style={{ color:'rgb(var(--up))' }}>
             Key Reasons
           </div>
           <ul className="space-y-2">
@@ -105,7 +109,7 @@ function AIAnalysisCard({ stock }) {
 
         {/* Risks */}
         <div>
-          <div className="text-xs font-bold uppercase tracking-wider mb-2.5" style={{ color:'#ef4444' }}>
+          <div className="text-xs font-bold uppercase tracking-wider mb-2.5" style={{ color:'rgb(var(--down))' }}>
             Risk Factors
           </div>
           <ul className="space-y-2">
@@ -125,7 +129,7 @@ function AIAnalysisCard({ stock }) {
           { label:'Fundamental', text: fundSummary },
           { label:'News Impact', text: newsImpact },
         ].map(({ label, text }) => (
-          <div key={label} className="rounded-xl p-3.5 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
+          <div key={label} className="rounded-lg p-3.5 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
             <div className="text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color:'var(--text-3)' }}>{label}</div>
             <p className="text-xs leading-relaxed" style={{ color:'var(--text-2)' }}>{text}</p>
           </div>
@@ -185,7 +189,7 @@ export default function StockDetail() {
   })
 
   const isUp        = liveChangePct != null && liveChangePct >= 0
-  const strokeColor = isUp ? '#10b981' : '#ef4444'
+  const strokeColor = liveChangePct == null ? 'var(--accent)' : isUp ? 'rgb(var(--up))' : 'rgb(var(--down))'
 
   /* ── Watchlist toggle ── */
   const toggleWatchlist = () => {
@@ -198,18 +202,18 @@ export default function StockDetail() {
     setWatchlist(!watchlisted)
   }
 
-  /* ── Smart signal badges (Quantix-style) ── */
+  /* ── Smart signal badges ── */
   const signals = []
   if (quote?.price && quote?.high && quote.price >= quote.high * 0.98)
-    signals.push({ label:'Trading near today\'s high', color:'#10b981', bg:'rgba(16,185,129,.08)', border:'rgba(16,185,129,.18)', icon:'📈' })
+    signals.push({ label:'Trading near today\'s high', rgb:'var(--up)', icon:ArrowUpRight })
   if (quote?.price && fundamentals?.week52High && quote.price >= fundamentals.week52High * 0.97)
-    signals.push({ label:'Near 52-week high', color:'#f59e0b', bg:'rgba(245,158,11,.08)', border:'rgba(245,158,11,.2)', icon:'🏆' })
+    signals.push({ label:'Near 52-week high', rgb:'var(--caution)', icon:ArrowUpToLine })
   if (quote?.price && fundamentals?.week52Low && quote.price <= fundamentals.week52Low * 1.05)
-    signals.push({ label:'Near 52-week low', color:'#ef4444', bg:'rgba(239,68,68,.08)', border:'rgba(239,68,68,.18)', icon:'⚠️' })
+    signals.push({ label:'Near 52-week low', rgb:'var(--down)', icon:AlertTriangle })
   if (liveChangePct != null && liveChangePct >= 4)
-    signals.push({ label:`Strong day +${liveChangePct.toFixed(1)}%`, color:'#10b981', bg:'rgba(16,185,129,.08)', border:'rgba(16,185,129,.18)', icon:'🚀' })
+    signals.push({ label:`Strong day +${liveChangePct.toFixed(1)}%`, rgb:'var(--up)', icon:Zap })
   if (liveChangePct != null && liveChangePct <= -4)
-    signals.push({ label:`Sharp decline ${liveChangePct.toFixed(1)}%`, color:'#ef4444', bg:'rgba(239,68,68,.08)', border:'rgba(239,68,68,.18)', icon:'📉' })
+    signals.push({ label:`Sharp decline ${liveChangePct.toFixed(1)}%`, rgb:'var(--down)', icon:TrendingDown })
 
   /* Build metrics list — only include rows where we have a real value */
   const fmt$ = v => v != null ? `$${Number(v).toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })}` : null
@@ -244,86 +248,71 @@ export default function StockDetail() {
       </Link>
 
       {/* ── Header ──────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5">
         <div className="flex items-center gap-4">
           <motion.div initial={{ scale:0.8, opacity:0 }} animate={{ scale:1, opacity:1 }}>
             {!logoError ? (
               <img
                 src={`https://static2.finnhub.io/file/publicdatany/finnhubimage/stock_logo/${symbol}.png`}
                 alt={symbol}
-                className="w-14 h-14 rounded-2xl object-contain p-1.5"
+                className="w-14 h-14 rounded-xl object-contain p-1.5"
                 style={{ background:'var(--bg-3)', border:'1px solid var(--border)' }}
                 onError={() => setLogoError(true)}
               />
             ) : (
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black"
-                style={{ background:`rgba(var(--accent-rgb),.15)`, color:'var(--accent)', border:`2px solid rgba(var(--accent-rgb),.25)` }}>
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center text-xl font-black"
+                style={{ background:`rgba(var(--accent-rgb),.1)`, color:'var(--accent)', border:`1px solid rgba(var(--accent-rgb),.25)` }}>
                 {symbol.charAt(0)}
               </div>
             )}
           </motion.div>
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-2xl font-black" style={{ color:'var(--text-1)' }}>{stock.symbol}</h1>
-              <span className="text-xs px-2.5 py-1 rounded-lg font-medium"
+              <h1 className="display-xl text-4xl sm:text-5xl" style={{ color:'var(--text-1)' }}>{stock.symbol}</h1>
+              <span className="text-xs px-2.5 py-1 rounded-md font-medium"
                 style={{ background:'var(--bg-3)', color:'var(--text-3)' }}>
                 {stock.sector}
               </span>
               {stock.exchange && (
-                <span className="text-xs px-2.5 py-1 rounded-lg font-medium"
+                <span className="text-xs px-2.5 py-1 rounded-md font-medium"
                   style={{ background:'var(--bg-3)', color:'var(--text-3)' }}>
                   {stock.exchange}
                 </span>
               )}
             </div>
-            <p className="text-sm mt-0.5" style={{ color:'var(--text-2)' }}>{stock.name}</p>
+            <p className="text-sm mt-1.5" style={{ color:'var(--text-2)' }}>{stock.name}</p>
           </div>
         </div>
 
         <div className="flex flex-col sm:items-end gap-3">
           <div>
-            <div className="flex items-center gap-2 mb-0.5">
-              <div className="text-3xl font-black font-mono" style={{ color: hasPrice ? 'var(--text-1)' : 'var(--text-3)' }}>
+            <div className="flex items-center gap-3 mb-1 sm:justify-end flex-wrap">
+              <div className="text-4xl font-black font-mono leading-none" style={{ color: hasPrice ? 'var(--text-1)' : 'var(--text-3)' }}>
                 {hasPrice ? `$${livePrice.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })}` : '—'}
               </div>
-              {/* Data status badge */}
-              {status === 'loading' && (
-                <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full"
-                  style={{ background:'rgba(148,163,184,.08)', color:'#94a3b8', border:'1px solid rgba(148,163,184,.15)' }}>
-                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse"/>Loading
-                </span>
-              )}
-              {status === 'live' && (
-                <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full"
-                  style={{ background:'rgba(16,185,129,.1)', color:'#10b981', border:'1px solid rgba(16,185,129,.2)' }}>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"/>Live
-                </span>
-              )}
-              {status === 'closed' && (
-                <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full"
-                  style={{ background:'rgba(245,158,11,.08)', color:'#f59e0b', border:'1px solid rgba(245,158,11,.2)' }}>
-                  <Clock size={10}/>Closed
-                </span>
-              )}
+              {/* Data status */}
+              {status === 'loading' && <StatusPill pulse>Loading</StatusPill>}
+              {status === 'live' && <StatusPill tone="live" pulse>Live</StatusPill>}
+              {status === 'closed' && <StatusPill><Clock size={10}/>Closed</StatusPill>}
               {(status === 'unavailable' || status === 'error') && (
-                <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full"
-                  style={{ background:'rgba(239,68,68,.08)', color:'#ef4444', border:'1px solid rgba(239,68,68,.2)' }}>
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider px-2.5 py-1 rounded-md border whitespace-nowrap"
+                  style={{ color:'rgb(var(--down))', background:'rgb(var(--down) / .08)', borderColor:'rgb(var(--down) / .2)' }}>
                   <WifiOff size={10}/>Unavailable
                 </span>
               )}
             </div>
             {hasPrice && (
-              <div className={`flex items-center gap-1.5 text-sm font-bold ${isUp ? 'text-emerald-400' : 'text-red-400'}`}>
-                {isUp ? <TrendingUp size={14}/> : <TrendingDown size={14}/>}
+              <div className={`flex items-center sm:justify-end gap-1.5 text-sm font-bold font-mono ${isUp ? 'text-emerald-400' : 'text-red-400'}`}>
+                {isUp ? <ArrowUpRight size={14}/> : <TrendingDown size={14}/>}
                 {isUp ? '+' : ''}{liveChange.toFixed(2)} ({isUp ? '+' : ''}{liveChangePct.toFixed(2)}%)
-                <span className="text-xs font-normal" style={{ color:'var(--text-3)' }}>Today</span>
+                <span className="text-xs font-normal font-sans" style={{ color:'var(--text-3)' }}>Today</span>
               </div>
             )}
             {lastUpdated && (
-              <div className="flex items-center gap-1 text-xs mt-0.5" style={{ color:'var(--text-3)' }}>
+              <div className="flex items-center sm:justify-end gap-1 text-xs mt-1" style={{ color:'var(--text-3)' }}>
                 <Clock size={10}/>
-                Updated {new Date(lastUpdated).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}
-                <button onClick={refetch} className="ml-1 opacity-60 hover:opacity-100 transition-opacity">
+                Updated <span className="font-mono">{new Date(lastUpdated).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}</span>
+                <button onClick={refetch} aria-label="Refresh quote" className="ml-1 opacity-60 hover:opacity-100 transition-opacity">
                   <RefreshCw size={10}/>
                 </button>
               </div>
@@ -331,67 +320,61 @@ export default function StockDetail() {
           </div>
           {/* Signal badges */}
           {signals.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-1">
-              {signals.map(s => (
-                <span key={s.label} className="text-xs font-semibold px-2.5 py-1 rounded-full border"
-                  style={{ color:s.color, background:s.bg, borderColor:s.border }}>
-                  {s.icon} {s.label}
+            <div className="flex flex-wrap sm:justify-end gap-1.5 mb-1">
+              {signals.map(({ label, rgb, icon:Icon }) => (
+                <span key={label} className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md border"
+                  style={{ color:`rgb(${rgb})`, background:`rgb(${rgb} / .08)`, borderColor:`rgb(${rgb} / .2)` }}>
+                  <Icon size={12}/> {label}
                 </span>
               ))}
             </div>
           )}
 
-          <div className="flex gap-2 flex-wrap">
-            <button onClick={toggleWatchlist}
-              className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl border transition-all"
+          <div className="flex gap-2 flex-wrap sm:justify-end items-center">
+            <button onClick={toggleWatchlist} aria-pressed={watchlisted}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border transition-colors"
               style={watchlisted
-                ? { background:'rgba(234,179,8,.1)', borderColor:'rgba(234,179,8,.3)', color:'#eab308' }
-                : { borderColor:'var(--border)', color:'var(--text-3)' }
+                ? { background:'rgba(var(--accent-rgb),.12)', borderColor:'rgba(var(--accent-rgb),.25)', color:'var(--text-1)' }
+                : { borderColor:'var(--border-light)', color:'var(--text-2)' }
               }>
-              <Star size={13} className={watchlisted ? 'fill-yellow-400 text-yellow-400' : ''}/>
+              <Star size={13} style={watchlisted ? { color:'var(--accent)', fill:'var(--accent)' } : undefined}/>
               {watchlisted ? 'Watching' : 'Watchlist'}
             </button>
             <Link to={`/compare?a=${stock.symbol}`}
-              className="flex items-center gap-1.5 text-xs px-3 py-2 rounded-xl border transition-all"
-              style={{ borderColor:'var(--border)', color:'var(--text-3)' }}>
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg border transition-colors hover:text-accent"
+              style={{ borderColor:'var(--border-light)', color:'var(--text-2)' }}>
               <GitCompare size={13}/> Compare
             </Link>
-            <button className="btn-primary text-xs py-2 px-4 flex items-center gap-1.5">
-              <Activity size={13}/> Trade
-            </button>
+            <Link to="/simulator" className="btn-primary text-xs py-2 px-4 flex items-center gap-1.5">
+              <Activity size={13}/> Practise a trade
+            </Link>
           </div>
         </div>
       </div>
 
       {/* ── Chart ───────────────────────────────────────────── */}
-      <div className="card border" style={{ borderColor:'var(--border)' }}>
+      <div className="card-flat">
         <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
           <div className="flex items-center gap-2">
             <BarChart2 size={14} style={{ color:'var(--accent)' }}/>
             <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Price Chart</span>
-            {chartSource && (
-              <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
-                style={chartLive
-                  ? { background:'rgba(16,185,129,.1)', color:'#10b981', border:'1px solid rgba(16,185,129,.2)' }
-                  : { background:'rgba(148,163,184,.08)', color:'#94a3b8', border:'1px solid rgba(148,163,184,.15)' }
-                }>
-                {chartLive ? <><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"/></> : <Database size={9}/>}
-                {chartSource}
-              </span>
+            {chartSource && (chartLive
+              ? <StatusPill tone="live" pulse>{chartSource}</StatusPill>
+              : <StatusPill><Database size={9}/>{chartSource}</StatusPill>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={refetchChart} className="p-1.5 rounded-lg transition-colors"
-              style={{ color:'var(--text-3)' }} title="Refresh chart">
+            <button onClick={refetchChart} className="p-1.5 rounded-md transition-colors hover:text-accent"
+              style={{ color:'var(--text-3)' }} title="Refresh chart" aria-label="Refresh chart">
               <RefreshCw size={12} className={chartLoading ? 'animate-spin' : ''}/>
             </button>
             <div className="flex gap-1">
               {RANGES.map(r => (
                 <button key={r} onClick={() => setRange(r)}
-                  className="text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-all"
+                  className="text-xs font-mono px-2.5 py-1.5 rounded-md font-semibold transition-colors"
                   style={range === r
-                    ? { background:`rgba(var(--accent-rgb),.12)`, color:'var(--accent)', border:`1px solid rgba(var(--accent-rgb),.2)` }
-                    : { color:'var(--text-3)', border:'1px solid transparent' }
+                    ? { background:`rgba(var(--accent-rgb),.12)`, color:'var(--text-1)', border:`1px solid rgba(var(--accent-rgb),.25)` }
+                    : { color:'var(--text-2)', background:'transparent', border:'1px solid transparent' }
                   }>
                   {r}
                 </button>
@@ -415,25 +398,25 @@ export default function StockDetail() {
                 <AreaChart data={chartData} margin={{ top:5, right:5, bottom:0, left:5 }}>
                   <defs>
                     <linearGradient id="stockGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor={strokeColor} stopOpacity={0.2}/>
+                      <stop offset="5%"  stopColor={strokeColor} stopOpacity={0.22}/>
                       <stop offset="95%" stopColor={strokeColor} stopOpacity={0}/>
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false}/>
-                  <XAxis dataKey="date" tick={{ fontSize:10, fill:'var(--text-3)' }}
+                  <XAxis dataKey="date" tick={MONO_TICK}
                     interval={Math.floor(chartData.length / 6)} axisLine={false} tickLine={false}/>
-                  <YAxis tick={{ fontSize:10, fill:'var(--text-3)' }} domain={['auto','auto']}
+                  <YAxis tick={MONO_TICK} domain={['auto','auto']}
                     axisLine={false} tickLine={false} tickFormatter={v => `$${v.toFixed(0)}`} width={56}/>
                   <Tooltip content={<ChartTooltip/>}/>
                   <Area type="monotone" dataKey="price" stroke={strokeColor}
-                    strokeWidth={2.5} fill="url(#stockGrad)"/>
+                    strokeWidth={2} fill="url(#stockGrad)"/>
                 </AreaChart>
               </ResponsiveContainer>
               {chartData.some(d => d.volume) && (
                 <>
                   <ResponsiveContainer width="100%" height={52} className="mt-1">
                     <BarChart data={chartData} margin={{ top:0, right:5, bottom:0, left:5 }}>
-                      <Bar dataKey="volume" fill="var(--border)" radius={[2,2,0,0]}/>
+                      <Bar dataKey="volume" fill="var(--border-light)" radius={[2,2,0,0]}/>
                     </BarChart>
                   </ResponsiveContainer>
                   <p className="text-xs text-right mt-1" style={{ color:'var(--text-3)' }}>Volume</p>
@@ -441,8 +424,8 @@ export default function StockDetail() {
               )}
             </motion.div>
           ) : (
-            <div className="flex items-center justify-center" style={{ height:300 }}>
-              <p className="text-sm" style={{ color:'var(--text-3)' }}>No chart data available</p>
+            <div className="flex items-center justify-center text-center px-4" style={{ height:300 }}>
+              <p className="text-sm" style={{ color:'var(--text-3)' }}>No chart data for this range. Try another range or refresh the chart.</p>
             </div>
           )}
         </AnimatePresence>
@@ -452,13 +435,13 @@ export default function StockDetail() {
       <motion.div
         initial={{ opacity:0, y:12 }} whileInView={{ opacity:1, y:0 }}
         viewport={{ once:true }} transition={{ duration:0.35 }}>
-        <div className="card border" style={{ borderColor:'var(--border)' }}>
+        <div className="card-flat">
           <div className="flex items-center gap-2 mb-4">
             <Activity size={14} style={{ color:'var(--accent)' }}/>
             <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Key Metrics</span>
             {fundamentals && (
-              <span className="text-xs px-2 py-0.5 rounded-full"
-                style={{ background:'rgba(16,185,129,.1)', color:'#10b981', border:'1px solid rgba(16,185,129,.2)' }}>
+              <span className="text-xs px-2 py-0.5 rounded-md font-medium"
+                style={{ background:'var(--bg-3)', color:'var(--text-3)' }}>
                 {fundamentals.source ?? 'Finnhub'}
               </span>
             )}
@@ -466,7 +449,7 @@ export default function StockDetail() {
           {fundsLoading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="rounded-xl p-3.5 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
+                <div key={i} className="rounded-lg p-3.5 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
                   <Skeleton h="h-3" w="w-16" className="mb-2"/>
                   <Skeleton h="h-5" w="w-24"/>
                 </div>
@@ -475,7 +458,7 @@ export default function StockDetail() {
           ) : metrics.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {metrics.map(([label, value]) => (
-                <div key={label} className="rounded-xl p-3.5 border"
+                <div key={label} className="rounded-lg p-3.5 border"
                   style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
                   <div className="text-xs mb-1 font-medium" style={{ color:'var(--text-3)' }}>{label}</div>
                   <div className="text-sm font-bold font-mono" style={{ color:'var(--text-1)' }}>{value}</div>
@@ -483,7 +466,7 @@ export default function StockDetail() {
               ))}
             </div>
           ) : (
-            <p className="text-sm" style={{ color:'var(--text-3)' }}>Metrics unavailable for {symbol}</p>
+            <p className="text-sm" style={{ color:'var(--text-3)' }}>No fundamentals returned for {symbol} yet. Check back shortly.</p>
           )}
 
           {/* Company description */}
@@ -511,7 +494,7 @@ export default function StockDetail() {
       <motion.div
         initial={{ opacity:0, y:12 }} whileInView={{ opacity:1, y:0 }}
         viewport={{ once:true }} transition={{ duration:0.35 }}>
-        <div className="card border" style={{ borderColor:'var(--border)' }}>
+        <div className="card-flat">
           <div className="flex items-center gap-2 mb-4">
             <Newspaper size={14} style={{ color:'var(--accent)' }}/>
             <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Latest News</span>
@@ -520,21 +503,25 @@ export default function StockDetail() {
             <div className="space-y-3">
               {relatedNews.map(n => (
                 <div key={n.id}
-                  className="flex gap-4 p-4 rounded-xl border transition-all cursor-pointer"
+                  className="flex gap-4 p-4 rounded-lg border transition-colors"
                   style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}
                   onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),.3)'}
                   onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
-                  <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${n.imageColor} shrink-0`}/>
+                  <div className="w-14 h-14 rounded-lg shrink-0 flex items-center justify-center"
+                    style={{ background:'var(--bg-3)', border:'1px solid var(--border)' }}>
+                    <Newspaper size={18} style={{ color:'var(--text-3)' }}/>
+                  </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-xs font-medium" style={{ color:'var(--text-3)' }}>{n.source}</span>
-                      <span style={{ color:'var(--border)' }}>·</span>
+                      <span style={{ color:'var(--border-light)' }}>·</span>
                       <span className="text-xs" style={{ color:'var(--text-3)' }}>{n.time}</span>
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                        n.sentiment === 'bullish'
-                          ? 'bg-emerald-400/10 text-emerald-400'
-                          : 'bg-red-400/10 text-red-400'
-                      }`}>{n.sentiment}</span>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
+                        n.sentiment === 'bullish' ? 'bg-emerald-400/10 text-emerald-400'
+                        : n.sentiment === 'bearish' ? 'bg-red-400/10 text-red-400' : ''
+                      }`} style={n.sentiment === 'bullish' || n.sentiment === 'bearish' ? undefined : { background:'var(--bg-3)', color:'var(--text-3)' }}>
+                        {n.sentiment}
+                      </span>
                     </div>
                     <p className="text-sm font-semibold leading-snug" style={{ color:'var(--text-1)' }}>
                       {n.title}
@@ -546,7 +533,7 @@ export default function StockDetail() {
           ) : (
             <div className="py-10 text-center">
               <Newspaper size={32} className="mx-auto mb-3 opacity-20" style={{ color:'var(--text-3)' }}/>
-              <p className="text-sm" style={{ color:'var(--text-3)' }}>No recent news for {stock.symbol}</p>
+              <p className="text-sm" style={{ color:'var(--text-3)' }}>No recent news for {stock.symbol}. Headlines show here when they publish.</p>
             </div>
           )}
         </div>
@@ -557,14 +544,14 @@ export default function StockDetail() {
         <motion.div
           initial={{ opacity:0, y:12 }} whileInView={{ opacity:1, y:0 }}
           viewport={{ once:true }} transition={{ duration:0.35 }}>
-          <div className="card border" style={{ borderColor:'var(--border)' }}>
+          <div className="card-flat">
             <div className="text-sm font-bold mb-4" style={{ color:'var(--text-1)' }}>
               Related in {stock.sector}
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {related.map(s => (
                 <Link key={s.symbol} to={`/stock/${s.symbol}`}
-                  className="rounded-xl p-3.5 border transition-all group"
+                  className="rounded-lg p-3.5 border transition-colors group"
                   style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}
                   onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),.4)'}
                   onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
@@ -574,7 +561,8 @@ export default function StockDetail() {
                   <div className="font-mono font-bold text-sm" style={{ color: s.price != null ? 'var(--text-1)' : 'var(--text-3)' }}>
                     {s.price != null ? `$${s.price.toFixed(2)}` : '—'}
                   </div>
-                  <div className={`text-xs font-bold ${s.changePct == null ? 'text-slate-500' : s.changePct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                  <div className={`text-xs font-bold font-mono ${s.changePct == null ? '' : s.changePct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+                    style={s.changePct == null ? { color:'var(--text-3)' } : undefined}>
                     {s.changePct != null ? `${s.changePct >= 0 ? '+' : ''}${s.changePct.toFixed(2)}%` : '—'}
                   </div>
                 </Link>

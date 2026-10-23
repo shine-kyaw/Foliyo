@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Briefcase, TrendingUp, DollarSign, PieChart, Plus, Search, X, Cpu } from 'lucide-react'
+import { Plus, Search, X } from 'lucide-react'
 import { stocks } from '../data/mockData'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
+import PageHeader from '../components/PageHeader'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart as RPie, Pie, Cell } from 'recharts'
 
-const COLORS = ['#06b6d4','#3b82f6','#8b5cf6','#10b981','#f59e0b','#ef4444','#ec4899','#14b8a6']
+const COLORS = ['#e8a43e','#6fa3b8','#8fb38a','#d9805c','#d8c7a6','#c98a6b','#3f6f82']
 
 /* ── localStorage ────────────────────────────────────────────── */
 const KEY = 'foliyo_portfolio'
@@ -44,7 +45,7 @@ function buildHistory(holdings, days = 180) {
 const ChartTip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null
   return (
-    <div className="rounded-xl px-3 py-2 text-xs border" style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
+    <div className="rounded-lg px-3 py-2 text-xs border" style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
       <p style={{ color:'var(--text-3)' }}>{label}</p>
       <p className="font-bold font-mono" style={{ color:'var(--text-1)' }}>
         ${payload[0]?.value?.toLocaleString('en-US', { minimumFractionDigits:2 })}
@@ -103,18 +104,18 @@ function AddPositionModal({ onAdd, onClose, existing }) {
     <motion.div
       initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background:'rgba(0,0,0,0.6)' }}
+      style={{ background:'rgba(10,10,12,0.6)' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
       <motion.div
         initial={{ scale:0.94, y:24 }} animate={{ scale:1, y:0 }} exit={{ scale:0.94, y:24 }}
-        className="w-full max-w-md rounded-2xl border p-6 relative"
+        className="w-full max-w-md rounded-xl border p-6 relative"
         style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
-        <button onClick={onClose}
-          className="absolute top-4 right-4 w-7 h-7 rounded-xl flex items-center justify-center"
+        <button onClick={onClose} aria-label="Close"
+          className="absolute top-4 right-4 w-7 h-7 rounded-md flex items-center justify-center"
           style={{ color:'var(--text-3)', background:'var(--bg-3)' }}>
           <X size={14}/>
         </button>
-        <h2 className="text-base font-black mb-5" style={{ color:'var(--text-1)' }}>Add Position</h2>
+        <h2 className="text-lg font-black mb-5" style={{ color:'var(--text-1)' }}>Add position</h2>
 
         {/* Stock search */}
         <div className="relative mb-4">
@@ -130,13 +131,13 @@ function AddPositionModal({ onAdd, onClose, existing }) {
           <AnimatePresence>
             {focused && results.length > 0 && (
               <motion.div initial={{ opacity:0, y:4 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}
-                className="absolute z-50 w-full mt-1 rounded-xl border shadow-xl overflow-hidden"
+                className="absolute z-50 w-full mt-1 rounded-lg border shadow-xl overflow-hidden"
                 style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
                 {results.map(s => (
                   <button key={s.symbol} onMouseDown={() => handleSelect(s)}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-white/5 transition-colors"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-[var(--bg-3)] transition-colors"
                     style={{ borderBottom:'1px solid var(--border)' }}>
-                    <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black"
+                    <div className="w-7 h-7 rounded-md flex items-center justify-center text-xs font-black"
                       style={{ background:`rgba(var(--accent-rgb),.1)`, color:'var(--accent)' }}>
                       {s.symbol.charAt(0)}
                     </div>
@@ -169,7 +170,7 @@ function AddPositionModal({ onAdd, onClose, existing }) {
 
         {/* Preview */}
         {estValue !== null && (
-          <div className="rounded-xl p-3 mb-4 grid grid-cols-2 gap-3 text-xs"
+          <div className="rounded-lg p-3 mb-4 grid grid-cols-2 gap-3 text-xs"
             style={{ background:'var(--bg-3)' }}>
             <div>
               <div style={{ color:'var(--text-3)' }}>Current Value</div>
@@ -186,11 +187,11 @@ function AddPositionModal({ onAdd, onClose, existing }) {
           </div>
         )}
 
-        {err && <p className="text-xs text-red-400 mb-3">{err}</p>}
+        {err && <p className="text-xs text-red-400 mb-3" role="alert">{err}</p>}
 
         <button onClick={handleSubmit}
           className="btn-primary w-full justify-center py-3">
-          <Plus size={14}/> Add to Portfolio
+          <Plus size={14}/> Add to portfolio
         </button>
       </motion.div>
     </motion.div>
@@ -240,17 +241,15 @@ export default function Portfolio() {
 
   const summaryCards = [
     { label:'Portfolio Value', value: totalValue > 0 ? `$${totalValue.toLocaleString('en-US',{minimumFractionDigits:2})}` : '—',
-      sub:'Total market value', icon:DollarSign, c:'var(--accent)', bg:`rgba(var(--accent-rgb),.1)` },
+      sub:'Total market value' },
     { label:'Total Return',
       value: totalGain >= 0 ? `+$${totalGain.toLocaleString('en-US',{minimumFractionDigits:2})}` : `-$${Math.abs(totalGain).toLocaleString('en-US',{minimumFractionDigits:2})}`,
       sub: `${totalGainPct >= 0 ? '+' : ''}${totalGainPct.toFixed(2)}% all time`,
-      icon:TrendingUp, c: totalGain >= 0 ? '#10b981' : '#ef4444',
-      bg: totalGain >= 0 ? 'rgba(16,185,129,.1)' : 'rgba(239,68,68,.1)' },
+      c: totalGain >= 0 ? 'rgb(var(--up))' : 'rgb(var(--down))' },
     { label:'Cost Basis', value: totalCost > 0 ? `$${totalCost.toLocaleString('en-US',{minimumFractionDigits:2})}` : '—',
-      sub:'Total invested', icon:Briefcase, c:'#3b82f6', bg:'rgba(59,130,246,.1)' },
+      sub:'Total invested' },
     { label:'Positions', value: holdings.length,
-      sub: `${holdings.filter(h => h.shares * h.currentPrice > h.shares * h.avgCost).length} winning`,
-      icon:PieChart, c:'#8b5cf6', bg:'rgba(139,92,246,.1)' },
+      sub: `${holdings.filter(h => h.shares * h.currentPrice > h.shares * h.avgCost).length} winning` },
   ]
 
   return (
@@ -268,37 +267,26 @@ export default function Portfolio() {
       </AnimatePresence>
 
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-black flex items-center gap-2.5" style={{ color:'var(--text-1)' }}>
-            <Briefcase size={22} style={{ color:'var(--accent)' }}/>
-            Portfolio
-          </h1>
-          <p className="text-sm mt-0.5" style={{ color:'var(--text-3)' }}>Track and manage your investment holdings</p>
-        </div>
-        <button className="btn-primary text-sm py-2.5" onClick={() => setShowModal(true)}>
-          <Plus size={14}/> Add Position
+      <PageHeader title="Portfolio" subtitle="Track and manage your investment holdings" className="mb-2">
+        <button className="btn-primary" onClick={() => setShowModal(true)}>
+          <Plus size={14}/> Add position
         </button>
-      </div>
+      </PageHeader>
 
       {holdings.length === 0 ? (
         /* ── Empty state ── */
         <motion.div initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
-          className="rounded-2xl border p-16 text-center"
+          className="rounded-xl border p-12 sm:p-16 text-center"
           style={{ background:'var(--bg-2)', borderColor:'var(--border)', borderStyle:'dashed' }}>
-          <Briefcase size={44} className="mx-auto mb-4 opacity-20" style={{ color:'var(--text-3)' }}/>
-          <h3 className="text-lg font-black mb-2" style={{ color:'var(--text-1)' }}>No portfolio holdings yet</h3>
-          <p className="text-sm mb-6 max-w-xs mx-auto" style={{ color:'var(--text-3)' }}>
-            Add your stock positions manually, or use the Simulator to practice trading with virtual money.
+          <h3 className="text-lg font-black mb-2" style={{ color:'var(--text-1)' }}>Add your first position</h3>
+          <p className="text-sm mb-6 max-w-sm mx-auto" style={{ color:'var(--text-2)' }}>
+            Log a stock with its share count and average cost to see value, gain or loss, and allocation. Or practise in the Simulator with virtual money.
           </p>
           <div className="flex items-center justify-center gap-3 flex-wrap">
-            <button className="btn-primary py-2.5" onClick={() => setShowModal(true)}>
-              <Plus size={14}/> Add Position
+            <button className="btn-primary" onClick={() => setShowModal(true)}>
+              <Plus size={14}/> Add position
             </button>
-            <Link to="/simulator"
-              className="btn-ghost py-2.5 flex items-center gap-2 text-sm font-semibold">
-              <Cpu size={14}/> Try Simulator
-            </Link>
+            <Link to="/simulator" className="btn-ghost">Try the Simulator</Link>
           </div>
         </motion.div>
       ) : (
@@ -307,31 +295,26 @@ export default function Portfolio() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {summaryCards.map((c, i) => (
               <motion.div key={c.label} initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }} transition={{ delay: i*0.07 }}
-                className="card border flex items-center gap-4" style={{ borderColor:'var(--border)' }}>
-                <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background:c.bg }}>
-                  <c.icon size={18} style={{ color:c.c }}/>
-                </div>
-                <div className="min-w-0">
-                  <div className="text-xs font-semibold uppercase tracking-wider mb-0.5" style={{ color:'var(--text-3)' }}>{c.label}</div>
-                  <div className="text-lg font-black font-mono truncate" style={{ color:'var(--text-1)' }}>{c.value}</div>
-                  <div className="text-xs" style={{ color:'var(--text-3)' }}>{c.sub}</div>
-                </div>
+                className="card-flat min-w-0">
+                <div className="section-label mb-2">{c.label}</div>
+                <div className="text-xl font-black font-mono truncate" style={{ color: c.c || 'var(--text-1)' }}>{c.value}</div>
+                <div className="text-xs font-mono mt-1" style={{ color:'var(--text-3)' }}>{c.sub}</div>
               </motion.div>
             ))}
           </div>
 
           {/* Chart + Donut */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="card border lg:col-span-2" style={{ borderColor:'var(--border)' }}>
+            <div className="card-flat lg:col-span-2">
               <div className="flex items-center justify-between mb-5">
                 <span className="font-bold text-sm" style={{ color:'var(--text-1)' }}>Performance</span>
                 <div className="flex gap-1">
                   {['1M','3M','6M','1Y'].map(r => (
                     <button key={r} onClick={() => setRange(r)}
-                      className="text-xs px-2.5 py-1.5 rounded-lg font-semibold transition-all"
+                      className="text-xs px-2.5 py-1.5 rounded-md font-semibold transition-colors"
                       style={range === r
-                        ? { background:`rgba(var(--accent-rgb),.12)`, color:'var(--accent)', border:`1px solid rgba(var(--accent-rgb),.2)` }
-                        : { color:'var(--text-3)', border:'1px solid transparent' }
+                        ? { background:`rgba(var(--accent-rgb),.12)`, color:'var(--text-1)', border:`1px solid rgba(var(--accent-rgb),.25)` }
+                        : { color:'var(--text-2)', border:'1px solid transparent' }
                       }>{r}</button>
                   ))}
                 </div>
@@ -344,19 +327,19 @@ export default function Portfolio() {
                       <stop offset="95%" stopColor="var(--accent)" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false}/>
-                  <XAxis dataKey="date" tick={{ fontSize:10, fill:'var(--text-3)' }}
+                  <CartesianGrid stroke="var(--border)" vertical={false}/>
+                  <XAxis dataKey="date" tick={{ fontSize:11, fill:'var(--text-3)' }}
                     interval={Math.floor(histSlice.length / 5)} axisLine={false} tickLine={false}/>
-                  <YAxis tick={{ fontSize:10, fill:'var(--text-3)' }}
+                  <YAxis tick={{ fontSize:11, fill:'var(--text-3)' }}
                     tickFormatter={v => `$${(v/1000).toFixed(0)}k`} axisLine={false} tickLine={false}
                     domain={['auto','auto']} width={44}/>
                   <Tooltip content={<ChartTip/>}/>
-                  <Area type="monotone" dataKey="value" stroke="var(--accent)" strokeWidth={2.5} fill="url(#portGrad)"/>
+                  <Area type="monotone" dataKey="value" stroke="var(--accent)" strokeWidth={2} fill="url(#portGrad)"/>
                 </AreaChart>
               </ResponsiveContainer>
             </div>
 
-            <div className="card border" style={{ borderColor:'var(--border)' }}>
+            <div className="card-flat">
               <div className="font-bold text-sm mb-4" style={{ color:'var(--text-1)' }}>Sector Allocation</div>
               <ResponsiveContainer width="100%" height={160}>
                 <RPie>
@@ -364,7 +347,7 @@ export default function Portfolio() {
                     {sectorData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]}/>)}
                   </Pie>
                   <Tooltip formatter={v => [`${v}%`, 'Allocation']}
-                    contentStyle={{ background:'var(--bg-2)', border:'1px solid var(--border)', borderRadius:10, fontSize:11 }}/>
+                    contentStyle={{ background:'var(--bg-2)', border:'1px solid var(--border)', borderRadius:8, fontSize:11 }}/>
                 </RPie>
               </ResponsiveContainer>
               <div className="space-y-2 mt-2">
@@ -382,15 +365,15 @@ export default function Portfolio() {
           </div>
 
           {/* Holdings Table */}
-          <div className="rounded-2xl overflow-hidden border" style={{ borderColor:'var(--border)' }}>
+          <div className="rounded-xl overflow-hidden border" style={{ borderColor:'var(--border)' }}>
             <div className="px-5 py-3.5 border-b flex items-center gap-2"
               style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
               {['holdings','performance'].map(t => (
                 <button key={t} onClick={() => setTab(t)}
-                  className="text-xs px-4 py-2 rounded-xl font-semibold capitalize transition-all"
+                  className="text-xs px-4 py-2 rounded-md font-semibold capitalize transition-colors"
                   style={tab === t
-                    ? { background:`rgba(var(--accent-rgb),.12)`, color:'var(--accent)', border:`1px solid rgba(var(--accent-rgb),.2)` }
-                    : { color:'var(--text-3)' }
+                    ? { background:`rgba(var(--accent-rgb),.12)`, color:'var(--text-1)', border:`1px solid rgba(var(--accent-rgb),.25)` }
+                    : { color:'var(--text-2)', border:'1px solid transparent' }
                   }>{t}</button>
               ))}
             </div>
@@ -415,7 +398,7 @@ export default function Portfolio() {
                         className="tr border-b" style={{ borderColor:'var(--border)' }}>
                         <td className="td">
                           <Link to={`/stock/${h.symbol}`} className="flex items-center gap-3 group">
-                            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black shrink-0"
+                            <div className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-black shrink-0"
                               style={{ background:`rgba(var(--accent-rgb),.1)`, color:'var(--accent)', border:`1px solid rgba(var(--accent-rgb),.18)` }}>
                               {h.symbol.charAt(0)}
                             </div>
@@ -443,7 +426,7 @@ export default function Portfolio() {
                           <div className={`font-mono font-bold text-sm ${gainLoss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                             {gainLoss >= 0 ? '+' : '-'}${Math.abs(gainLoss).toFixed(2)}
                           </div>
-                          <div className={`text-xs ${gainPct >= 0 ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
+                          <div className={`text-xs font-mono ${gainPct >= 0 ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
                             {gainPct >= 0 ? '+' : ''}{gainPct.toFixed(2)}%
                           </div>
                         </td>
@@ -456,8 +439,8 @@ export default function Portfolio() {
                           </div>
                         </td>
                         <td className="td text-right">
-                          <button onClick={() => removeHolding(h.symbol)}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center ml-auto transition-colors hover:bg-red-400/10"
+                          <button onClick={() => removeHolding(h.symbol)} aria-label={`Remove ${h.symbol}`}
+                            className="w-7 h-7 rounded-md flex items-center justify-center ml-auto transition-colors hover:bg-red-400/10"
                             style={{ color:'var(--text-3)' }}>
                             <X size={12}/>
                           </button>
@@ -476,7 +459,7 @@ export default function Portfolio() {
                 <span className="font-black font-mono text-sm" style={{ color:'var(--text-1)' }}>
                   ${totalValue.toLocaleString('en-US', { minimumFractionDigits:2 })}
                 </span>
-                <span className={`font-black text-sm ${totalGainPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                <span className={`font-black font-mono text-sm ${totalGainPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                   {totalGainPct >= 0 ? '+' : ''}{totalGainPct.toFixed(2)}%
                 </span>
               </div>

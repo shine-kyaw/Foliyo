@@ -2,14 +2,16 @@ import { createContext, useContext, useState, useEffect } from 'react'
 
 const AppContext = createContext(null)
 
+/* Accents come from the Foliyo mark. Each has a deeper `light` variant so
+ * accent-coloured text keeps its contrast on the cream light theme. */
 const ACCENT_COLORS = {
-  cyan:    { name: 'Cyan',    value: '#06b6d4', rgb: '6,182,212'   },
-  blue:    { name: 'Blue',    value: '#3b82f6', rgb: '59,130,246'  },
-  violet:  { name: 'Violet', value: '#8b5cf6', rgb: '139,92,246'  },
-  emerald: { name: 'Green',  value: '#10b981', rgb: '16,185,129'  },
-  orange:  { name: 'Orange', value: '#f97316', rgb: '249,115,22'  },
-  rose:    { name: 'Rose',   value: '#f43f5e', rgb: '244,63,94'   },
+  marigold: { name: 'Marigold', value: '#e8a43e', rgb: '232,164,62',  light: { value: '#a96a12', rgb: '169,106,18'  } },
+  steel:    { name: 'Steel',    value: '#6fa3b8', rgb: '111,163,184', light: { value: '#2e6378', rgb: '46,99,120'   } },
+  sage:     { name: 'Sage',     value: '#8fb38a', rgb: '143,179,138', light: { value: '#4b7445', rgb: '75,116,69'   } },
+  clay:     { name: 'Clay',     value: '#d9805c', rgb: '217,128,92',  light: { value: '#a4492a', rgb: '164,73,42'   } },
+  cream:    { name: 'Cream',    value: '#e9dfca', rgb: '233,223,202', light: { value: '#2e4a57', rgb: '46,74,87'    } },
 }
+const DEFAULT_ACCENT = 'marigold'
 
 function getSystemScheme() {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
@@ -19,7 +21,11 @@ export function AppProvider({ children }) {
   // 'dark' | 'light' | 'system'
   const [theme, setTheme]       = useState(() => localStorage.getItem('foliyo_theme') || 'dark')
   const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches)
-  const [accent, setAccent]     = useState(() => localStorage.getItem('foliyo_accent') || 'cyan')
+  // Accents saved before the rebrand (cyan, violet…) no longer exist — fall back to marigold
+  const [accent, setAccent]     = useState(() => {
+    const saved = localStorage.getItem('foliyo_accent')
+    return ACCENT_COLORS[saved] ? saved : DEFAULT_ACCENT
+  })
   const [fontSize, setFontSize] = useState(() => localStorage.getItem('foliyo_fontsize') || 'md')
 
   const [sidebarOpen, setSidebar]   = useState(false)
@@ -31,7 +37,7 @@ export function AppProvider({ children }) {
   const [authError, setAuthError] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
 
-  const accentColor = ACCENT_COLORS[accent]
+  const accentColor = ACCENT_COLORS[accent] ?? ACCENT_COLORS[DEFAULT_ACCENT]
 
   // Listen for OS-level color scheme changes
   useEffect(() => {
@@ -52,8 +58,9 @@ export function AppProvider({ children }) {
 
     const root = document.documentElement
     root.setAttribute('data-theme', effectiveTheme)
-    root.style.setProperty('--accent', accentColor.value)
-    root.style.setProperty('--accent-rgb', accentColor.rgb)
+    const tone = effectiveTheme === 'light' ? accentColor.light : accentColor
+    root.style.setProperty('--accent', tone.value)
+    root.style.setProperty('--accent-rgb', tone.rgb)
 
     const scales = { sm: '0.9', md: '1', lg: '1.12' }
     root.style.setProperty('--font-scale', scales[fontSize])

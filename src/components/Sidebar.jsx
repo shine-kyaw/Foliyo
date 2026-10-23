@@ -1,8 +1,15 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, LogIn, UserPlus, LogOut, User, Sun, Moon, Monitor, Type, Palette, ChevronRight, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { useQuote } from '../hooks/useQuote'
+import { BrandLockup } from './Navbar'
+
+/* Segmented-control states, shared by every picker in the panel */
+const SEG_ON  = { background:'rgba(var(--accent-rgb),.12)', color:'var(--text-1)', borderColor:'rgba(var(--accent-rgb),.25)' }
+const SEG_OFF = { background:'transparent', color:'var(--text-2)', borderColor:'transparent' }
+const SEG_WRAP = { background:'var(--bg-2)', borderColor:'var(--border)' }
 
 const overlay = { hidden:{ opacity:0 }, visible:{ opacity:1 }, exit:{ opacity:0 } }
 const panel = {
@@ -42,10 +49,10 @@ function AlertsPreview() {
   const chg   = quote?.changePct
   const hasPrice = price != null
   return (
-    <div className="rounded-xl p-4 border mt-3" style={{ background:'var(--bg-3)', borderColor:'var(--border)' }}>
+    <div className="rounded-lg p-4 border mt-3" style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
       <div className="flex items-center gap-3 mb-3">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm"
-          style={{ background:`rgba(var(--accent-rgb),.15)`, color:'var(--accent)' }}>A</div>
+        <div className="w-9 h-9 rounded-lg flex items-center justify-center font-black text-sm"
+          style={{ background:`rgba(var(--accent-rgb),.12)`, color:'var(--accent)' }}>A</div>
         <div>
           <div className="font-bold text-sm" style={{ color:'var(--text-1)' }}>AAPL · Apple Inc.</div>
           <div className="text-xs" style={{ color:'var(--text-3)' }}>Technology · NASDAQ</div>
@@ -55,7 +62,8 @@ function AlertsPreview() {
         <span className="font-black font-mono" style={{ color: hasPrice ? 'var(--text-1)' : 'var(--text-3)' }}>
           {hasPrice ? `$${price.toFixed(2)}` : '—'}
         </span>
-        <span className={`text-sm font-bold ${chg == null ? 'text-slate-500' : chg >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+        <span className={`text-sm font-bold font-mono ${chg == null ? '' : chg >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
+          style={chg == null ? { color:'var(--text-3)' } : undefined}>
           {chg != null ? `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%` : '—'}
         </span>
       </div>
@@ -76,6 +84,7 @@ export default function Sidebar() {
   } = useApp()
 
   const [showPw, setShowPw] = useState(false)
+  const navigate = useNavigate()
 
   return (
     <AnimatePresence>
@@ -87,24 +96,24 @@ export default function Sidebar() {
           <motion.div key="panel" variants={panel} initial="hidden" animate="visible" exit="exit"
             className="sidebar-panel" style={{ background:'var(--bg-1)' }}>
 
-            {/* Tab Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b shrink-0"
+            {/* Brand + tab header */}
+            <div className="px-5 pt-4 pb-4 border-b shrink-0 space-y-4"
               style={{ borderColor:'var(--border)' }}>
-              <div className="flex gap-1 p-1 rounded-xl" style={{ background:'var(--bg-3)' }}>
+              <div className="flex items-center justify-between">
+                <BrandLockup size={24} />
+                <button onClick={() => setSidebar(false)} aria-label="Close panel"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-white/5"
+                  style={{ color:'var(--text-2)' }}>
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="flex gap-1 p-1 rounded-lg border" style={SEG_WRAP}>
                 {['account','preferences'].map(tab => (
                   <button key={tab} onClick={() => setSidebarTab(tab)}
-                    className="px-4 py-1.5 rounded-lg text-sm font-semibold capitalize transition-all"
-                    style={sidebarTab === tab
-                      ? { background:'var(--bg-1)', color:'var(--text-1)', boxShadow:'0 2px 8px rgba(0,0,0,.25)' }
-                      : { color:'var(--text-3)' }
-                    }>{tab}</button>
+                    className="flex-1 px-4 py-1.5 rounded-md text-sm font-semibold capitalize border transition-all"
+                    style={sidebarTab === tab ? SEG_ON : SEG_OFF}>{tab}</button>
                 ))}
               </div>
-              <button onClick={() => setSidebar(false)}
-                className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors hover:bg-white/8"
-                style={{ color:'var(--text-3)' }}>
-                <X size={16} />
-              </button>
             </div>
 
             {/* Body */}
@@ -117,8 +126,8 @@ export default function Sidebar() {
                     {user ? (
                       <div>
                         <div className="text-center py-4">
-                          <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-black mx-auto mb-3 relative"
-                            style={{ background:`rgba(var(--accent-rgb),.15)`, color:'var(--accent)', border:`2px solid rgba(var(--accent-rgb),.3)` }}>
+                          <div className="w-16 h-16 rounded-xl flex items-center justify-center text-2xl font-black mx-auto mb-3 relative"
+                            style={{ background:`rgba(var(--accent-rgb),.12)`, color:'var(--accent)', border:`1px solid rgba(var(--accent-rgb),.25)` }}>
                             {user.name.charAt(0).toUpperCase()}
                             {user.provider === 'google' && (
                               <span className="absolute -bottom-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center"
@@ -130,18 +139,19 @@ export default function Sidebar() {
                           <div className="font-bold text-base" style={{ color:'var(--text-1)' }}>{user.name}</div>
                           <div className="text-sm mt-0.5" style={{ color:'var(--text-3)' }}>{user.email}</div>
                           {user.provider === 'google' && (
-                            <span className="inline-flex items-center gap-1 text-xs mt-1.5 px-2 py-0.5 rounded-full"
-                              style={{ background:'rgba(66,133,244,.1)', color:'#4285F4', border:'1px solid rgba(66,133,244,.2)' }}>
+                            <span className="inline-flex items-center gap-1.5 text-xs mt-2 px-2 py-0.5 rounded-md"
+                              style={{ background:'var(--bg-2)', color:'var(--text-2)', border:'1px solid var(--border)' }}>
                               <GoogleIcon /> Signed in with Google
                             </span>
                           )}
                         </div>
 
                         <div className="space-y-2 mt-4">
-                          {['My Portfolio','Watchlists','AI Alerts','Settings'].map(item => (
+                          {[['My portfolio','/portfolio'],['Watchlist','/watchlist'],['AI alerts','/ai-alerts'],['Preferences',null]].map(([item, to]) => (
                             <button key={item}
-                              className="w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-colors"
-                              style={{ background:'var(--bg-3)', color:'var(--text-2)' }}>
+                              onClick={() => to ? (navigate(to), setSidebar(false)) : setSidebarTab('preferences')}
+                              className="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium transition-colors border"
+                              style={{ background:'var(--bg-2)', color:'var(--text-2)', borderColor:'var(--border)' }}>
                               {item}
                               <ChevronRight size={14} style={{ color:'var(--text-3)' }} />
                             </button>
@@ -149,8 +159,8 @@ export default function Sidebar() {
                         </div>
 
                         <button onClick={handleSignOut}
-                          className="w-full mt-6 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all"
-                          style={{ background:'rgba(239,68,68,.1)', color:'#ef4444', border:'1px solid rgba(239,68,68,.2)' }}>
+                          className="w-full mt-6 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-bold transition-colors"
+                          style={{ background:'rgb(var(--down) / .1)', color:'rgb(var(--down))', border:'1px solid rgb(var(--down) / .2)' }}>
                           <LogOut size={15} /> Sign Out
                         </button>
                       </div>
@@ -158,17 +168,14 @@ export default function Sidebar() {
                     ) : (
                       <div>
                         {/* Sign-in / Sign-up toggle */}
-                        <div className="flex rounded-xl p-1 mb-5" style={{ background:'var(--bg-3)' }}>
+                        <div className="flex rounded-lg p-1 mb-5 gap-1 border" style={SEG_WRAP}>
                           {[
                             { key:'signin', label:'Sign In'  },
                             { key:'signup', label:'Sign Up'  },
                           ].map(t => (
                             <button key={t.key} onClick={() => setAuthTab(t.key)}
-                              className="flex-1 py-2 rounded-lg text-sm font-bold transition-all"
-                              style={authTab === t.key
-                                ? { background:'var(--bg-1)', color:'var(--text-1)', boxShadow:'0 2px 8px rgba(0,0,0,.2)' }
-                                : { color:'var(--text-3)' }
-                              }>{t.label}</button>
+                              className="flex-1 py-2 rounded-md text-sm font-bold border transition-all"
+                              style={authTab === t.key ? SEG_ON : SEG_OFF}>{t.label}</button>
                           ))}
                         </div>
 
@@ -176,8 +183,8 @@ export default function Sidebar() {
                         <button
                           onClick={handleGoogleSignIn}
                           disabled={authLoading}
-                          className="w-full flex items-center justify-center gap-2.5 py-2.5 rounded-xl text-sm font-semibold mb-4 transition-all disabled:opacity-60"
-                          style={{ background:'var(--bg-3)', color:'var(--text-1)', border:'1px solid var(--border)' }}>
+                          className="btn-ghost w-full justify-center gap-2.5 py-2.5 mb-4 disabled:opacity-60"
+                          style={{ color:'var(--text-1)' }}>
                           {authLoading
                             ? <><Loader2 size={15} className="animate-spin" /> Signing in…</>
                             : <><GoogleIcon /> Continue with Google</>
@@ -198,25 +205,26 @@ export default function Sidebar() {
                               initial={{ opacity:0, x:-10 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0, x:10 }}
                               className="space-y-4">
                               <div>
-                                <label className="block text-xs font-semibold mb-1.5" style={{ color:'var(--text-3)' }}>Email</label>
-                                <input className="input" type="email" placeholder="you@example.com"
+                                <label htmlFor="si-email" className="block text-xs font-semibold mb-1.5" style={{ color:'var(--text-2)' }}>Email</label>
+                                <input id="si-email" className="input" type="email" placeholder="you@example.com"
                                   value={authForm.email}
                                   onChange={e => setAuthForm(f => ({ ...f, email: e.target.value }))} />
                               </div>
                               <div>
-                                <label className="block text-xs font-semibold mb-1.5" style={{ color:'var(--text-3)' }}>Password</label>
+                                <label htmlFor="si-password" className="block text-xs font-semibold mb-1.5" style={{ color:'var(--text-2)' }}>Password</label>
                                 <div className="relative">
-                                  <input className="input pr-10" type={showPw ? 'text' : 'password'} placeholder="••••••••"
+                                  <input id="si-password" className="input pr-10" type={showPw ? 'text' : 'password'} placeholder="••••••••"
                                     value={authForm.password}
                                     onChange={e => setAuthForm(f => ({ ...f, password: e.target.value }))} />
                                   <button type="button" onClick={() => setShowPw(!showPw)}
+                                    aria-label={showPw ? 'Hide password' : 'Show password'}
                                     className="absolute right-3 top-1/2 -translate-y-1/2"
                                     style={{ color:'var(--text-3)' }}>
                                     {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
                                   </button>
                                 </div>
                               </div>
-                              {authError && <p className="text-xs text-red-400 font-medium">{authError}</p>}
+                              {authError && <p role="alert" className="text-xs text-red-400 font-medium">{authError}</p>}
                               <button type="submit" className="btn-primary w-full justify-center py-3 mt-1">
                                 <LogIn size={14} /> Sign In
                               </button>
@@ -224,7 +232,7 @@ export default function Sidebar() {
                                 No account?{' '}
                                 <button type="button" onClick={() => setAuthTab('signup')}
                                   className="font-semibold hover:underline" style={{ color:'var(--accent)' }}>
-                                  Sign up free
+                                  Create one
                                 </button>
                               </p>
                             </motion.form>
@@ -236,31 +244,32 @@ export default function Sidebar() {
                               initial={{ opacity:0, x:10 }} animate={{ opacity:1, x:0 }} exit={{ opacity:0, x:-10 }}
                               className="space-y-4">
                               <div>
-                                <label className="block text-xs font-semibold mb-1.5" style={{ color:'var(--text-3)' }}>Full Name</label>
-                                <input className="input" type="text" placeholder="Your name"
+                                <label htmlFor="su-name" className="block text-xs font-semibold mb-1.5" style={{ color:'var(--text-2)' }}>Full Name</label>
+                                <input id="su-name" className="input" type="text" placeholder="Your name"
                                   value={authForm.name}
                                   onChange={e => setAuthForm(f => ({ ...f, name: e.target.value }))} />
                               </div>
                               <div>
-                                <label className="block text-xs font-semibold mb-1.5" style={{ color:'var(--text-3)' }}>Email</label>
-                                <input className="input" type="email" placeholder="you@example.com"
+                                <label htmlFor="su-email" className="block text-xs font-semibold mb-1.5" style={{ color:'var(--text-2)' }}>Email</label>
+                                <input id="su-email" className="input" type="email" placeholder="you@example.com"
                                   value={authForm.email}
                                   onChange={e => setAuthForm(f => ({ ...f, email: e.target.value }))} />
                               </div>
                               <div>
-                                <label className="block text-xs font-semibold mb-1.5" style={{ color:'var(--text-3)' }}>Password</label>
+                                <label htmlFor="su-password" className="block text-xs font-semibold mb-1.5" style={{ color:'var(--text-2)' }}>Password</label>
                                 <div className="relative">
-                                  <input className="input pr-10" type={showPw ? 'text' : 'password'} placeholder="Min. 8 characters"
+                                  <input id="su-password" className="input pr-10" type={showPw ? 'text' : 'password'} placeholder="Choose a password"
                                     value={authForm.password}
                                     onChange={e => setAuthForm(f => ({ ...f, password: e.target.value }))} />
                                   <button type="button" onClick={() => setShowPw(!showPw)}
+                                    aria-label={showPw ? 'Hide password' : 'Show password'}
                                     className="absolute right-3 top-1/2 -translate-y-1/2"
                                     style={{ color:'var(--text-3)' }}>
                                     {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
                                   </button>
                                 </div>
                               </div>
-                              {authError && <p className="text-xs text-red-400 font-medium">{authError}</p>}
+                              {authError && <p role="alert" className="text-xs text-red-400 font-medium">{authError}</p>}
                               <button type="submit" className="btn-primary w-full justify-center py-3 mt-1">
                                 <UserPlus size={14} /> Create Account
                               </button>
@@ -282,25 +291,22 @@ export default function Sidebar() {
                 {/* PREFERENCES */}
                 {sidebarTab === 'preferences' && (
                   <motion.div key="prefs" initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}
-                    className="space-y-8">
+                    className="space-y-7">
 
                     {/* Appearance */}
                     <div>
                       <div className="flex items-center gap-2 mb-3">
                         {effectiveTheme === 'dark'
-                          ? <Moon size={15} style={{ color:'var(--accent)' }} />
-                          : <Sun size={15} style={{ color:'var(--accent)' }} />
+                          ? <Moon size={15} style={{ color:'var(--text-2)' }} />
+                          : <Sun size={15} style={{ color:'var(--text-2)' }} />
                         }
                         <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Appearance</span>
                       </div>
-                      <div className="flex rounded-xl p-1 gap-0.5" style={{ background:'var(--bg-3)' }}>
+                      <div className="flex rounded-lg p-1 gap-1 border" style={SEG_WRAP}>
                         {THEME_OPTIONS.map(({ key, label, icon: Icon }) => (
                           <button key={key} onClick={() => setTheme(key)}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition-all"
-                            style={theme === key
-                              ? { background:'var(--bg-1)', color:'var(--text-1)', boxShadow:'0 2px 10px rgba(0,0,0,.25)' }
-                              : { color:'var(--text-3)' }
-                            }>
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md text-xs font-bold border transition-all"
+                            style={theme === key ? SEG_ON : SEG_OFF}>
                             <Icon size={12} />
                             {label}
                           </button>
@@ -318,7 +324,7 @@ export default function Sidebar() {
                     {/* Accent Color */}
                     <div>
                       <div className="flex items-center gap-2 mb-3">
-                        <Palette size={15} style={{ color:'var(--accent)' }} />
+                        <Palette size={15} style={{ color:'var(--text-2)' }} />
                         <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Accent Color</span>
                       </div>
                       <div className="flex gap-3 flex-wrap">
@@ -326,6 +332,7 @@ export default function Sidebar() {
                           <button key={key} onClick={() => setAccent(key)}
                             className={`color-swatch${accent === key ? ' active' : ''}`}
                             style={{ background: c.value }}
+                            aria-label={c.name} aria-pressed={accent === key}
                             title={c.name} />
                         ))}
                       </div>
@@ -337,17 +344,14 @@ export default function Sidebar() {
                     {/* Font Size */}
                     <div>
                       <div className="flex items-center gap-2 mb-3">
-                        <Type size={15} style={{ color:'var(--accent)' }} />
+                        <Type size={15} style={{ color:'var(--text-2)' }} />
                         <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Text Size</span>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex rounded-lg p-1 gap-1 border" style={SEG_WRAP}>
                         {FONT_SIZES.map(s => (
                           <button key={s.key} onClick={() => setFontSize(s.key)}
-                            className="flex-1 py-2.5 rounded-xl text-sm font-bold transition-all border"
-                            style={fontSize === s.key
-                              ? { background:`rgba(var(--accent-rgb),.12)`, color:'var(--accent)', borderColor:`rgba(var(--accent-rgb),.3)` }
-                              : { color:'var(--text-3)', borderColor:'var(--border)' }
-                            }>{s.label}</button>
+                            className="flex-1 py-2.5 rounded-md text-sm font-bold transition-all border"
+                            style={fontSize === s.key ? SEG_ON : SEG_OFF}>{s.label}</button>
                         ))}
                       </div>
                     </div>
@@ -366,7 +370,7 @@ export default function Sidebar() {
             {/* Footer */}
             <div className="px-5 py-4 border-t shrink-0" style={{ borderColor:'var(--border)' }}>
               <p className="text-xs text-center" style={{ color:'var(--text-3)' }}>
-                Foliyo · Portfolio Intelligence Platform
+                Foliyo · Market tracking
               </p>
             </div>
           </motion.div>

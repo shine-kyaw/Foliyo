@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { BookMarked, Search, Star, X, TrendingUp, TrendingDown, Brain, Plus, CheckCircle } from 'lucide-react'
+import { Search, Star, X, TrendingUp, TrendingDown, Brain, Plus, CheckCircle } from 'lucide-react'
 import { usStocks, euStocks, asiaStocks, commodities, currencies, cryptos } from '../data/mockData'
 import { generateAIAnalysis } from '../utils/aiAnalysis'
 import { api } from '../services/api'
 import { useQuote } from '../hooks/useQuote'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
+import PageHeader from '../components/PageHeader'
 
 const ALL_ASSETS = [...usStocks, ...euStocks, ...asiaStocks, ...cryptos, ...commodities, ...currencies]
 
@@ -52,6 +53,8 @@ function buildSparkline(price, changePct, n = 14) {
 }
 
 function Sparkline({ id, price, changePct, width = 72, height = 28 }) {
+  // Nothing to draw until a price arrives — keeps NaN out of the SVG
+  if (!Number.isFinite(price) || !Number.isFinite(changePct)) return <div style={{ width, height }} />
   const data = buildSparkline(price, changePct)
   const min = Math.min(...data), max = Math.max(...data)
   const range = max - min || price * 0.001
@@ -63,7 +66,7 @@ function Sparkline({ id, price, changePct, width = 72, height = 28 }) {
   })
   const line = pts.join(' ')
   const fill = `0,${height} ${line} ${width},${height}`
-  const color = changePct >= 0 ? '#10b981' : '#ef4444'
+  const color = changePct >= 0 ? 'rgb(var(--up))' : 'rgb(var(--down))'
   const gid = `sp${id.replace(/[^a-z0-9]/gi, '')}`
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ overflow:'visible', display:'block' }}>
@@ -90,12 +93,12 @@ function fmtPrice(price, type) {
 function VerdictTag({ verdict }) {
   if (!verdict) return null
   const cfg = {
-    Bullish: { color:'#10b981', bg:'rgba(16,185,129,.12)' },
-    Bearish: { color:'#ef4444', bg:'rgba(239,68,68,.12)'  },
-    Neutral: { color:'#f59e0b', bg:'rgba(245,158,11,.12)' },
+    Bullish: { color:'rgb(var(--up))',      bg:'rgb(var(--up) / .12)'      },
+    Bearish: { color:'rgb(var(--down))',    bg:'rgb(var(--down) / .12)'    },
+    Neutral: { color:'rgb(var(--caution))', bg:'rgb(var(--caution) / .12)' },
   }[verdict] || {}
   return (
-    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none"
+    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md leading-none"
       style={{ color:cfg.color, background:cfg.bg }}>
       {verdict}
     </span>
@@ -165,7 +168,7 @@ function AddStockSearch({ pinned, onAdd }) {
           onBlur={() => setTimeout(() => setFocused(false), 180)}
         />
         {query && (
-          <button onClick={() => setQuery('')}
+          <button onClick={() => setQuery('')} aria-label="Clear search"
             className="absolute right-3 top-1/2 -translate-y-1/2"
             style={{ color:'var(--text-3)' }}>
             <X size={13}/>
@@ -215,7 +218,7 @@ function AddStockSearch({ pinned, onAdd }) {
                         <div className="text-sm font-mono font-semibold" style={{ color:'var(--text-1)' }}>
                           {fmtPrice(s.price, s.type)}
                         </div>
-                        <div className={`text-xs font-bold ${isUp ? 'text-emerald-400' : 'text-red-400'}`}>
+                        <div className={`text-xs font-bold font-mono ${isUp ? 'text-emerald-400' : 'text-red-400'}`}>
                           {isUp ? '+' : ''}{(s.changePct ?? 0).toFixed(2)}%
                         </div>
                       </div>
@@ -251,7 +254,7 @@ function AddStockSearch({ pinned, onAdd }) {
             ) : (
               <>
                 <Search size={20} className="mx-auto mb-2 opacity-20" style={{ color:'var(--text-3)' }}/>
-                <p className="text-sm" style={{ color:'var(--text-3)' }}>No results for "{query}"</p>
+                <p className="text-sm" style={{ color:'var(--text-3)' }}>No match for "{query}". Try the ticker symbol or part of the company name.</p>
               </>
             )}
           </motion.div>
@@ -264,7 +267,7 @@ function AddStockSearch({ pinned, onAdd }) {
           <motion.div
             initial={{ opacity:0, y:-8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0, y:-8 }}
             className="absolute left-0 -bottom-10 flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-lg"
-            style={{ background:'rgba(16,185,129,.1)', color:'#10b981', border:'1px solid rgba(16,185,129,.2)' }}>
+            style={{ background:'rgb(var(--up) / .1)', color:'rgb(var(--up))', border:'1px solid rgb(var(--up) / .2)' }}>
             <CheckCircle size={12}/> {added} added to watchlist
           </motion.div>
         )}
@@ -277,25 +280,17 @@ function AddStockSearch({ pinned, onAdd }) {
 function WatchTile({ stock, onRemove }) {
   const hasPrice = stock.price != null
   const up = hasPrice && stock.changePct >= 0
-  const color = !hasPrice ? '#94a3b8' : up ? '#10b981' : '#ef4444'
+  const color = !hasPrice ? 'var(--text-3)' : up ? 'rgb(var(--up))' : 'rgb(var(--down))'
   const ai = stock.sector && hasPrice ? generateAIAnalysis(stock) : null
 
   return (
     <div className="relative group">
       <Link to={`/stock/${stock.symbol}`}>
-        <motion.div
-          whileHover={{ y:-4, scale:1.02 }}
-          whileTap={{ scale:0.97 }}
-          transition={{ type:'spring', stiffness:400, damping:28 }}
-          className="rounded-2xl p-4 h-full flex flex-col"
-          style={{
-            background: !hasPrice
-              ? 'linear-gradient(145deg, rgba(148,163,184,0.06), rgba(148,163,184,0.02))'
-              : up
-                ? 'linear-gradient(145deg, rgba(16,185,129,0.07), rgba(16,185,129,0.03))'
-                : 'linear-gradient(145deg, rgba(239,68,68,0.07), rgba(239,68,68,0.03))',
-            border: `1px solid ${!hasPrice ? 'rgba(148,163,184,0.18)' : up ? 'rgba(16,185,129,0.18)' : 'rgba(239,68,68,0.18)'}`,
-          }}>
+        <div
+          className="rounded-xl p-4 h-full flex flex-col border transition-colors"
+          style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}
+          onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),.32)'}
+          onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
           <div className="flex items-start justify-between mb-1 gap-1">
             <span className="font-black text-sm leading-none" style={{ color:'var(--text-1)' }}>
               {stock.symbol}
@@ -309,27 +304,28 @@ function WatchTile({ stock, onRemove }) {
             {stock.name.split(' ').slice(0, 3).join(' ')}
           </div>
           <div className="flex-1 flex items-center mb-3">
-            <Sparkline id={stock.symbol} price={stock.price} changePct={stock.changePct} width={108} height={40}/>
+            {hasPrice && <Sparkline id={stock.symbol} price={stock.price} changePct={stock.changePct} width={108} height={40}/>}
           </div>
           <div>
             <div className="font-black font-mono text-lg leading-none tracking-tight" style={{ color: hasPrice ? 'var(--text-1)' : 'var(--text-3)' }}>
               {hasPrice ? fmtPrice(stock.price, 'stock') : '—'}
             </div>
-            <div className="text-xs font-bold mt-1" style={{ color }}>
+            <div className="text-xs font-bold font-mono mt-1" style={{ color }}>
               {hasPrice ? `${up ? '+' : ''}${stock.changePct.toFixed(2)}%` : '—'}
               {hasPrice && stock.change != null && (
-                <span className="font-normal ml-1 opacity-70">
+                <span className="font-normal ml-1 opacity-70 font-mono">
                   {up ? '+' : ''}{stock.change.toFixed(2)}
                 </span>
               )}
             </div>
           </div>
-        </motion.div>
+        </div>
       </Link>
       <button
         onClick={() => onRemove(stock.symbol)}
-        className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full flex items-center justify-center z-10
-                   opacity-0 group-hover:opacity-100 transition-opacity duration-150 hover:bg-white/15"
+        aria-label={`Remove ${stock.symbol} from watchlist`}
+        className="absolute top-2.5 right-2.5 w-5 h-5 rounded-md flex items-center justify-center z-10
+                   opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity duration-150 hover:bg-[var(--bg-3)]"
         style={{ color:'var(--text-3)' }}>
         <X size={10}/>
       </button>
@@ -369,7 +365,7 @@ function AssetRow({ item, type, inWatchlist, onAdd, onRemove, index }) {
       transition={{ delay: Math.min(index * 0.018, 0.35) }}
       className="asset-row flex items-center gap-3 px-4 py-3 border-b"
       style={{ borderColor:'var(--border)' }}>
-      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black shrink-0"
+      <div className="w-8 h-8 rounded-md flex items-center justify-center text-xs font-black shrink-0"
         style={{ background:`rgba(var(--accent-rgb),.1)`, color:'var(--accent)', border:`1px solid rgba(var(--accent-rgb),.15)` }}>
         {item.symbol.charAt(0)}
       </div>
@@ -388,16 +384,19 @@ function AssetRow({ item, type, inWatchlist, onAdd, onRemove, index }) {
         <div className="font-mono font-bold text-sm" style={{ color: hasPrice ? 'var(--text-1)' : 'var(--text-3)' }}>
           {hasPrice ? fmtPrice(item.price, type) : '—'}
         </div>
-        <div className={`text-xs font-semibold flex items-center justify-end gap-0.5 mt-0.5 ${!hasPrice ? 'text-slate-500' : isUp ? 'text-emerald-400' : 'text-red-400'}`}>
+        <div className={`text-xs font-semibold font-mono flex items-center justify-end gap-0.5 mt-0.5 ${!hasPrice ? '' : isUp ? 'text-emerald-400' : 'text-red-400'}`}
+          style={!hasPrice ? { color:'var(--text-3)' } : undefined}>
           {hasPrice && (isUp ? <TrendingUp size={9}/> : <TrendingDown size={9}/>)}
           {hasPrice ? `${isUp ? '+' : ''}${item.changePct.toFixed(2)}%` : '—'}
         </div>
       </div>
       <button
         onClick={e => { e.preventDefault(); e.stopPropagation(); inWatchlist ? onRemove(item.symbol) : onAdd(item.symbol) }}
-        className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 transition-all"
-        style={{ color: inWatchlist ? '#eab308' : 'var(--text-3)' }}>
-        <Star size={13} className={inWatchlist ? 'fill-yellow-400' : ''}/>
+        aria-label={inWatchlist ? `Remove ${item.symbol} from watchlist` : `Add ${item.symbol} to watchlist`}
+        aria-pressed={inWatchlist}
+        className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 transition-colors hover:text-accent"
+        style={{ color: inWatchlist ? 'var(--accent)' : 'var(--text-3)' }}>
+        <Star size={13} style={inWatchlist ? { fill:'var(--accent)' } : undefined}/>
       </button>
     </motion.div>
   )
@@ -413,10 +412,10 @@ function SectionList({ title, items, type, flag, pinned, onAdd, onRemove }) {
       <div className="flex items-center gap-2 mb-2 px-0.5">
         {flag && <span className="text-sm">{flag}</span>}
         <span className="section-label">{title}</span>
-        <span className="text-xs px-1.5 py-0.5 rounded-md font-medium"
+        <span className="text-xs font-mono px-1.5 py-0.5 rounded-md font-medium"
           style={{ background:'var(--bg-3)', color:'var(--text-3)' }}>{items.length}</span>
       </div>
-      <div className="rounded-2xl overflow-hidden border"
+      <div className="rounded-xl overflow-hidden border"
         style={{ borderColor:'var(--border)', background:'var(--bg-1)' }}>
         {items.map((item, i) => (
           <AssetRow key={item.symbol} item={item} type={type} index={i}
@@ -491,27 +490,19 @@ export default function Watchlist() {
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 page-enter">
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-5 mb-7">
-        <div>
-          <h1 className="text-2xl font-black flex items-center gap-2.5" style={{ color:'var(--text-1)' }}>
-            <BookMarked size={21} style={{ color:'var(--accent)' }}/>
-            Watchlist
-          </h1>
-          <p className="text-sm mt-0.5" style={{ color:'var(--text-3)' }}>
-            Track your favourite stocks, crypto, commodities & FX
-          </p>
-        </div>
+      <PageHeader className="mb-7" title="Watchlist"
+        subtitle="Track your favourite stocks, crypto, commodities & FX">
         {/* Add stock search */}
-        <div className="relative">
+        <div className="relative w-full sm:w-80">
           <AddStockSearch pinned={pinned} onAdd={addPin}/>
         </div>
-      </div>
+      </PageHeader>
 
       {/* Watchlist Intelligence bar */}
       {stockPinned.length >= 2 && bestToday && worstToday && bestToday.symbol !== worstToday.symbol && (
         <motion.div
           initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }}
-          className="rounded-2xl p-4 mb-6 flex flex-col sm:flex-row gap-3 border"
+          className="rounded-xl p-4 mb-6 flex flex-col sm:flex-row gap-3 border"
           style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <Brain size={13} style={{ color:'var(--accent)' }}/>
@@ -526,7 +517,7 @@ export default function Watchlist() {
               <Link to={`/stock/${bestToday.symbol}`} className="text-xs font-bold hover:underline" style={{ color:'var(--text-1)' }}>
                 {bestToday.symbol}
               </Link>
-              <span className="text-xs font-bold text-emerald-400">+{bestToday.changePct.toFixed(2)}%</span>
+              <span className="text-xs font-bold font-mono text-emerald-400">+{bestToday.changePct.toFixed(2)}%</span>
             </div>
             <div className="flex items-center gap-2">
               <TrendingDown size={13} className="text-red-400 shrink-0"/>
@@ -534,7 +525,7 @@ export default function Watchlist() {
               <Link to={`/stock/${worstToday.symbol}`} className="text-xs font-bold hover:underline" style={{ color:'var(--text-1)' }}>
                 {worstToday.symbol}
               </Link>
-              <span className="text-xs font-bold text-red-400">{worstToday.changePct.toFixed(2)}%</span>
+              <span className="text-xs font-bold font-mono text-red-400">{worstToday.changePct.toFixed(2)}%</span>
             </div>
           </div>
         </motion.div>
@@ -544,17 +535,17 @@ export default function Watchlist() {
       {pinnedItems.length > 0 ? (
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-3">
-            <Star size={12} className="text-yellow-400 fill-yellow-400"/>
+            <Star size={12} style={{ color:'var(--accent)', fill:'var(--accent)' }}/>
             <span className="section-label">Watching</span>
-            <span className="text-xs px-1.5 py-0.5 rounded-md font-medium"
+            <span className="text-xs font-mono px-1.5 py-0.5 rounded-md font-medium"
               style={{ background:'var(--bg-3)', color:'var(--text-3)' }}>{pinnedItems.length}</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
             {pinnedItems.map((s, i) => (
               <motion.div key={s.symbol}
-                initial={{ opacity:0, scale:0.93, y:8 }}
-                animate={{ opacity:1, scale:1, y:0 }}
-                transition={{ delay: i * 0.05, type:'spring', stiffness:400, damping:30 }}>
+                initial={{ opacity:0, y:8 }}
+                animate={{ opacity:1, y:0 }}
+                transition={{ delay: Math.min(i * 0.03, 0.3), duration:0.25 }}>
                 <LiveWatchTile symbol={s.symbol} onRemove={removePin}/>
               </motion.div>
             ))}
@@ -563,12 +554,12 @@ export default function Watchlist() {
       ) : (
         /* Empty state */
         <motion.div initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
-          className="rounded-2xl border p-10 mb-8 text-center"
+          className="rounded-xl border p-10 mb-8 text-center"
           style={{ background:'var(--bg-2)', borderColor:'var(--border)', borderStyle:'dashed' }}>
           <Star size={36} className="mx-auto mb-3 opacity-20" style={{ color:'var(--text-3)' }}/>
-          <h3 className="font-bold text-base mb-1" style={{ color:'var(--text-1)' }}>Your watchlist is empty</h3>
+          <h3 className="font-bold text-base mb-1" style={{ color:'var(--text-1)' }}>Add your first ticker</h3>
           <p className="text-sm" style={{ color:'var(--text-3)' }}>
-            Search for stocks above to start tracking your favourite assets.
+            Search by ticker or company name above, or tap the star on any row below.
           </p>
         </motion.div>
       )}
@@ -590,14 +581,14 @@ export default function Watchlist() {
       </div>
 
       {/* Tab bar */}
-      <div className="flex gap-1 p-1 rounded-xl border mb-6 w-fit overflow-x-auto"
+      <div className="flex gap-1 p-1 rounded-lg border mb-6 w-fit max-w-full overflow-x-auto"
         style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap"
+            className="px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap"
             style={tab === t.key
-              ? { background:`rgba(var(--accent-rgb),.12)`, color:'var(--accent)', border:`1px solid rgba(var(--accent-rgb),.2)` }
-              : { color:'var(--text-3)', border:'1px solid transparent' }
+              ? { background:`rgba(var(--accent-rgb),.12)`, color:'var(--text-1)', border:`1px solid rgba(var(--accent-rgb),.25)` }
+              : { color:'var(--text-2)', background:'transparent', border:'1px solid transparent' }
             }>{t.label}</button>
         ))}
       </div>
@@ -614,7 +605,7 @@ export default function Watchlist() {
           {totalCount === 0 && (
             <div className="text-center py-20" style={{ color:'var(--text-3)' }}>
               <Search size={32} className="mx-auto mb-3 opacity-20"/>
-              <p className="text-sm">No results for "{search}"</p>
+              <p className="text-sm">No results for "{search}". Check the spelling or clear the filter.</p>
             </div>
           )}
         </motion.div>
