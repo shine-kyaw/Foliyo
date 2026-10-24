@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight } from 'lucide-react'
 import { useIndices } from '../hooks/useIndices'
@@ -19,8 +20,14 @@ const ITEMS = [
 const fmt = (v, fx) => v == null ? '—'
   : v.toLocaleString('en-US', { minimumFractionDigits: fx ? 4 : 2, maximumFractionDigits: fx ? 4 : 2 })
 
-function StripItem({ item, quote: live }) {
-  const { data } = useChart(item.spark, '1D', null)
+function StripItem({ item, quote: live, index }) {
+  const { data, loading, refetch } = useChart(item.spark, '1D', null)
+  // The chart provider allows ~8 calls a minute; a cold start can miss some — retry staggered
+  useEffect(() => {
+    if (loading || data?.length) return
+    const id = setTimeout(refetch, 30_000 + index * 9_000)
+    return () => clearTimeout(id)
+  }, [loading, data, refetch, index])
   // Crypto/FX/gold feeds can be rate-limited; fall back to the intraday series' last print
   const quote = live || (item.asset && data?.length > 1 ? (() => {
     const first = data[0].price, last = data.at(-1).price
@@ -61,8 +68,8 @@ export default function MarketStrip() {
           <ChevronRight size={14} style={{ color:'var(--text-3)' }}/>
         </Link>
         <div className="flex overflow-x-auto no-scrollbar flex-1" style={{ scrollbarWidth:'none' }}>
-          {ITEMS.map(item => (
-            <StripItem key={item.key} item={item} quote={item.asset ? assets[item.key] : byKey[item.key]} />
+          {ITEMS.map((item, index) => (
+            <StripItem key={item.key} item={item} index={index} quote={item.asset ? assets[item.key] : byKey[item.key]} />
           ))}
         </div>
       </div>
