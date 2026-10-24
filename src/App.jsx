@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AppProvider } from './context/AppContext'
+import { AppProvider, useApp } from './context/AppContext'
+import { AlertsProvider } from './context/AlertsContext'
+import AlertToasts from './components/AlertToasts'
 import Layout from './components/Layout'
 import Sidebar from './components/Sidebar'
 import Landing from './pages/Landing'
@@ -47,14 +49,23 @@ function AnimatedRoutes() {
   )
 }
 
+/* Pages read saved data on mount; remount them when sign-in/out swaps it */
+function Pages() {
+  const { dataVersion } = useApp()
+  return <AnimatedRoutes key={dataVersion} />
+}
+
 export default function App() {
   return (
     <AppProvider>
       <BrowserRouter>
-        <Layout>
-          <Sidebar />
-          <AnimatedRoutes />
-        </Layout>
+        <AlertsProvider>
+          <Layout>
+            <Sidebar />
+            <Pages />
+          </Layout>
+          <AlertToasts />
+        </AlertsProvider>
       </BrowserRouter>
     </AppProvider>
   )

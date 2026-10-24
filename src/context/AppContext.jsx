@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
+import { account, getToken, setToken } from '../services/account'
+import { pullUserData, clearUserData } from '../utils/userStore'
 
 const AppContext = createContext(null)
 
@@ -36,8 +38,23 @@ export function AppProvider({ children }) {
   const [authForm, setAuthForm] = useState({ email: '', password: '', name: '' })
   const [authError, setAuthError] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
+  const [authChecked, setAuthChecked] = useState(false)
+  const [accountConfig, setAccountConfig] = useState(null)   // { enabled, google, emailAlerts }
+  const [dataVersion, setDataVersion] = useState(0)          // bumps when synced data is replaced
 
   const accentColor = ACCENT_COLORS[accent] ?? ACCENT_COLORS[DEFAULT_ACCENT]
+
+  // What the server offers, and whether a saved session is still valid
+  useEffect(() => {
+    account.config()
+      .then(setAccountConfig)
+      .catch(() => setAccountConfig({ enabled: false, google: null, emailAlerts: false, unreachable: true }))
+    if (!getToken()) { setAuthChecked(true); return }
+    account.me()
+      .then(({ user }) => setUser(user))
+      .catch(err => { if (err.status === 401) setToken(null) })
+      .finally(() => setAuthChecked(true))
+  }, [])
 
   // Listen for OS-level color scheme changes
   useEffect(() => {
@@ -66,41 +83,57 @@ export function AppProvider({ children }) {
     root.style.setProperty('--font-scale', scales[fontSize])
   }, [effectiveTheme, theme, accent, fontSize, accentColor])
 
-  // Mock email sign-in
-  const handleSignIn = (e) => {
-    e.preventDefault()
-    if (!authForm.email || !authForm.password) { setAuthError('Fill in all fields.'); return }
-    setUser({ email: authForm.email, name: authForm.email.split('@')[0], provider: 'email' })
+  /* ── Accounts ─────────────────────────────────────────────── */
+  const finishAuth = async ({ token, user }) => {
+    setToken(token)
+    setUser(user)
+    setAuthForm({ email: '', password: '', name: '' })
     setAuthError('')
+    try { await pullUserData() } catch { /* local copy stays usable */ }
+    setDataVersion(v => v + 1)
     setSidebar(false)
   }
 
-  // Mock email sign-up
-  const handleSignUp = (e) => {
-    e.preventDefault()
-    if (!authForm.email || !authForm.password || !authForm.name) { setAuthError('Fill in all fields.'); return }
-    setUser({ email: authForm.email, name: authForm.name, provider: 'email' })
-    setAuthError('')
-    setSidebar(false)
-  }
-
-  // Mock Google sign-in (simulates OAuth flow)
-  const handleGoogleSignIn = async () => {
+  const run = async (fn) => {
     setAuthLoading(true)
     setAuthError('')
-    await new Promise(r => setTimeout(r, 900)) // simulate OAuth round-trip
-    const mockEmails = ['alex.morgan@gmail.com', 'sam.chen@gmail.com', 'jordan.lee@gmail.com']
-    const mockEmail = mockEmails[Math.floor(Math.random() * mockEmails.length)]
-    const mockName = mockEmail.split('@')[0].replace('.', ' ').replace(/\b\w/g, c => c.toUpperCase())
-    setUser({ email: mockEmail, name: mockName, provider: 'google', avatar: mockName.charAt(0) })
-    setAuthLoading(false)
-    setSidebar(false)
+    try { await finishAuth(await fn()) }
+    catch (err) { setAuthError(err.message) }
+    finally { setAuthLoading(false) }
   }
 
+  const handleSignIn = (e) => {
+    e.preventDefault()
+    if (!authForm.email.trim()) { setAuthError('Enter your email address.'); return }
+    if (!authForm.password) { setAuthError('Enter your password.'); return }
+    run(() => account.signIn(authForm.email, authForm.password))
+  }
+
+  const handleSignUp = (e) => {
+    e.preventDefault()
+    if (!authForm.name.trim()) { setAuthError('Enter your name.'); return }
+    if (!authForm.email.trim()) { setAuthError('Enter your email address.'); return }
+    if (authForm.password.length < 8) { setAuthError('Use at least 8 characters for your password.'); return }
+    run(() => account.signUp(authForm.name, authForm.email, authForm.password))
+  }
+
+  // Google Identity Services hands us a signed ID token; the API verifies it
+  const handleGoogleCredential = (credential) => run(() => account.google(credential))
+
   const handleSignOut = () => {
+    setToken(null)
+    clearUserData()
     setUser(null)
     setAuthForm({ email: '', password: '', name: '' })
     setAuthError('')
+    setDataVersion(v => v + 1)
+  }
+
+  const handleDeleteAccount = async () => {
+    setAuthLoading(true)
+    try { await account.remove(); handleSignOut() }
+    catch (err) { setAuthError(err.message) }
+    finally { setAuthLoading(false) }
   }
 
   return (
@@ -112,8 +145,9 @@ export function AppProvider({ children }) {
       sidebarOpen, setSidebar,
       sidebarTab, setSidebarTab,
       authTab, setAuthTab,
-      user, authForm, setAuthForm, authError, setAuthError, authLoading,
-      handleSignIn, handleSignUp, handleGoogleSignIn, handleSignOut,
+      user, authChecked, accountConfig, dataVersion,
+      authForm, setAuthForm, authError, setAuthError, authLoading,
+      handleSignIn, handleSignUp, handleGoogleCredential, handleSignOut, handleDeleteAccount,
     }}>
       {children}
     </AppContext.Provider>

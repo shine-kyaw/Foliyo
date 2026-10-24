@@ -20,13 +20,14 @@ export const usStocks = [
   { symbol:'GS',    name:'Goldman Sachs',          price:467.84, change:-3.21,  changePct:-0.68, volume:'2.1M',  mktCap:'156B',  sector:'Financials',    pe:14.2, region:'US' },
   { symbol:'XOM',   name:'Exxon Mobil',            price:118.43, change:0.87,   changePct:0.74,  volume:'14.3M', mktCap:'471B',  sector:'Energy',        pe:14.8, region:'US' },
   { symbol:'WMT',   name:'Walmart Inc.',           price:68.24,  change:0.42,   changePct:0.62,  volume:'11.2M', mktCap:'548B',  sector:'Cons. Staples', pe:31.4, region:'US' },
+  { symbol:'MRVL',  name:'Marvell Technology',     price:74.32,  change:2.14,   changePct:2.96,  volume:'12.8M', mktCap:'64B',   sector:'Technology',    pe:48.4, region:'US' },
 ]
 
 /* ── European Stocks ──────────────────────────────────────── */
 export const euStocks = [
   { symbol:'ASML',  name:'ASML Holding N.V.',      price:924.70, change:18.42,  changePct:2.03,  volume:'842K',  mktCap:'367B',  sector:'Technology',    pe:47.2, region:'EU', exchange:'NASDAQ' },
   { symbol:'SAP',   name:'SAP SE',                 price:201.34, change:2.84,   changePct:1.43,  volume:'1.2M',  mktCap:'233B',  sector:'Technology',    pe:38.4, region:'EU', exchange:'NYSE'   },
-  { symbol:'LVMH',  name:'LVMH Moët Hennessy',     price:736.80, change:-8.40,  changePct:-1.13, volume:'512K',  mktCap:'372B',  sector:'Cons. Disc.',   pe:22.6, region:'EU', exchange:'OTC'    },
+  { symbol:'LVMUY', name:'LVMH Moët Hennessy (ADR)', price:85.83, change:-1.13,  changePct:-1.30, volume:'512K',  mktCap:'372B',  sector:'Cons. Disc.',   pe:22.6, region:'EU', exchange:'OTC'    },
   { symbol:'SHEL',  name:'Shell plc',              price:32.84,  change:0.34,   changePct:1.05,  volume:'6.4M',  mktCap:'218B',  sector:'Energy',        pe:11.4, region:'EU', exchange:'NYSE'   },
   { symbol:'AZN',   name:'AstraZeneca PLC',        price:78.42,  change:1.12,   changePct:1.45,  volume:'3.8M',  mktCap:'246B',  sector:'Healthcare',    pe:32.1, region:'EU', exchange:'NASDAQ' },
   { symbol:'NVS',   name:'Novartis AG',            price:104.22, change:0.88,   changePct:0.85,  volume:'2.1M',  mktCap:'237B',  sector:'Healthcare',    pe:18.4, region:'EU', exchange:'NYSE'   },
@@ -37,7 +38,7 @@ export const euStocks = [
   { symbol:'TTE',   name:'TotalEnergies SE',       price:64.82,  change:0.74,   changePct:1.15,  volume:'2.4M',  mktCap:'160B',  sector:'Energy',        pe:8.9,  region:'EU', exchange:'NYSE'   },
   { symbol:'UL',    name:'Unilever PLC',           price:52.34,  change:0.28,   changePct:0.54,  volume:'1.8M',  mktCap:'126B',  sector:'Cons. Staples', pe:19.2, region:'EU', exchange:'NYSE'   },
   { symbol:'EADSF', name:'Airbus SE',              price:168.44, change:3.12,   changePct:1.89,  volume:'612K',  mktCap:'131B',  sector:'Industrials',   pe:28.4, region:'EU', exchange:'OTC'    },
-  { symbol:'RMS',   name:'Hermès International',  price:2148.0, change:32.00,  changePct:1.51,  volume:'88K',   mktCap:'224B',  sector:'Cons. Disc.',   pe:52.4, region:'EU', exchange:'OTC'    },
+  { symbol:'HESAY', name:'Hermès International (ADR)', price:138.06, change:-6.12, changePct:-4.24, volume:'88K',   mktCap:'224B',  sector:'Cons. Disc.',   pe:52.4, region:'EU', exchange:'OTC'    },
 ]
 
 /* ── Asia / Taiwan / China ────────────────────────────────── */
@@ -50,9 +51,8 @@ export const asiaStocks = [
   { symbol:'NIO',    name:'NIO Inc.',                    price:6.42,   change:-0.18, changePct:-2.73, volume:'42.1M', mktCap:'12B',   sector:'Cons. Disc.', pe:null, region:'CN', exchange:'NYSE'  },
   { symbol:'SONY',   name:'Sony Group Corp.',            price:93.42,  change:1.28,  changePct:1.39,  volume:'1.4M',  mktCap:'116B',  sector:'Technology', pe:17.4, region:'JP', exchange:'NYSE'   },
   { symbol:'TM',     name:'Toyota Motor Corp.',          price:228.14, change:2.84,  changePct:1.26,  volume:'624K',  mktCap:'318B',  sector:'Cons. Disc.', pe:8.4,  region:'JP', exchange:'NYSE'  },
-  { symbol:'SSNLF',  name:'Samsung Electronics',         price:54.72,  change:-0.84, changePct:-1.51, volume:'812K',  mktCap:'367B',  sector:'Technology', pe:22.4, region:'KR', exchange:'OTC'    },
+  { symbol:'SKHY',   name:'SK hynix (ADR)',              price:137.02, change:5.33,  changePct:4.05,  volume:'—',     mktCap:'0.98T', sector:'Technology', pe:null, region:'KR', exchange:'NASDAQ' },
   { symbol:'SE',     name:'Sea Limited',                 price:54.18,  change:1.24,  changePct:2.34,  volume:'4.2M',  mktCap:'31B',   sector:'Technology', pe:null, region:'SG', exchange:'NYSE'   },
-  { symbol:'MRVL',   name:'Marvell Technology',          price:74.32,  change:2.14,  changePct:2.96,  volume:'12.8M', mktCap:'64B',   sector:'Technology', pe:48.4, region:'US', exchange:'NASDAQ' },
   { symbol:'UMC',    name:'United Microelectronics',     price:9.24,   change:0.14,  changePct:1.54,  volume:'5.4M',  mktCap:'23B',   sector:'Technology', pe:12.8, region:'TW', exchange:'NYSE'   },
 ]
 
@@ -147,10 +147,10 @@ export const newsArticles = [
   { id:12, title:'Goldman Sachs Cuts 2024 S&P 500 Target Amid Rate Uncertainty', summary:'Goldman Sachs lowered its year-end S&P 500 target from 5,200 to 4,900, citing higher-for-longer interest rate expectations and compressed earnings multiples in the technology sector.', source:'WSJ', time:'15h ago', category:'Macro', sentiment:'bearish', relatedSymbols:['GS','JPM','BRK.B'], url:'#' },
   { id:13, title:'Bitcoin Hits $70K as Spot ETF Inflows Reach Record $2.4B in Single Day', summary:'Bitcoin surpassed $70,000 for the first time since March as spot Bitcoin ETFs recorded a record $2.4 billion in net inflows in a single trading session, driven by institutional demand.', source:'CoinDesk', time:'16h ago', category:'Crypto', sentiment:'bullish', relatedSymbols:['BTC','ETH','BNB'], url:'#' },
   { id:14, title:'Intel Loses Market Share to AMD in Server CPU Segment', summary:"AMD's EPYC processors captured over 32% of the server CPU market in Q1, up from 24% a year ago, at Intel's expense. Intel's data center revenues fell 8% year-over-year as customers await Granite Rapids.", source:'Reuters', time:'17h ago', category:'Corporate', sentiment:'bearish', relatedSymbols:['INTC','AMD','NVDA'], url:'#' },
-  { id:15, title:'LVMH Revenues Decline 2% as Chinese Luxury Demand Softens', summary:'LVMH reported a slight revenue decline in Q1, the first such drop in six years, as Chinese consumers pulled back on luxury spending. European and American markets remained resilient.', source:'FT', time:'18h ago', category:'Earnings', sentiment:'bearish', relatedSymbols:['LVMH','RMS'], url:'#' },
+  { id:15, title:'LVMH Revenues Decline 2% as Chinese Luxury Demand Softens', summary:'LVMH reported a slight revenue decline in Q1, the first such drop in six years, as Chinese consumers pulled back on luxury spending. European and American markets remained resilient.', source:'FT', time:'18h ago', category:'Earnings', sentiment:'bearish', relatedSymbols:['LVMUY','HESAY'], url:'#' },
   { id:16, title:'Netflix Q1 Subscriber Growth Smashes Expectations at 9.3M', summary:'Netflix added 9.3 million subscribers in Q1, far exceeding analyst estimates of 4.8 million. The ad-supported tier now accounts for 40% of new sign-ups in available markets.', source:'Bloomberg', time:'20h ago', category:'Earnings', sentiment:'bullish', relatedSymbols:['NFLX','META','GOOGL'], url:'#' },
   { id:17, title:'Gold Surpasses $2,400 Amid Geopolitical Uncertainty and Dollar Weakness', summary:'Gold futures hit a new all-time high above $2,400 per troy ounce, driven by central bank buying from emerging markets, geopolitical tensions, and a weakening US dollar index.', source:'Reuters', time:'21h ago', category:'Commodities', sentiment:'bullish', relatedSymbols:['GC=F','SI=F','GLD','XOM'], url:'#' },
-  { id:18, title:'Samsung Announces 2nm Chip Production Timeline for 2025', summary:"Samsung's foundry division announced its 2nm gate-all-around process is on track for mass production in 2025. The announcement intensifies competition with TSMC for Apple and NVIDIA orders.", source:'Nikkei Asia', time:'22h ago', category:'Corporate', sentiment:'neutral', relatedSymbols:['SSNLF','TSM','AAPL','NVDA'], url:'#' },
+  { id:18, title:'Samsung Announces 2nm Chip Production Timeline for 2025', summary:"Samsung's foundry division announced its 2nm gate-all-around process is on track for mass production in 2025. The announcement intensifies competition with TSMC for Apple and NVIDIA orders.", source:'Nikkei Asia', time:'22h ago', category:'Corporate', sentiment:'neutral', relatedSymbols:['TSM','AAPL','NVDA'], url:'#' },
   { id:19, title:'JPMorgan Q1 Profit Falls 4% as Investment Banking Revenue Slips', summary:"JPMorgan Chase reported a 4% decline in Q1 profit as investment banking fees fell short of expectations. However, net interest income rose 11%, and the bank maintained its full-year NII guidance.", source:'CNBC', time:'1d ago', category:'Earnings', sentiment:'neutral', relatedSymbols:['JPM','GS','V'], url:'#' },
   { id:20, title:'Salesforce to Acquire Informatica for $11.4B in Data Cloud Push', summary:'Salesforce confirmed it is acquiring data management company Informatica for approximately $11.4 billion in a bid to strengthen its Data Cloud and AI platform capabilities.', source:'WSJ', time:'1d ago', category:'Corporate', sentiment:'bullish', relatedSymbols:['CRM','MSFT','ORCL'], url:'#' },
 ]

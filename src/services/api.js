@@ -5,14 +5,14 @@
  */
 
 // e.g. "https://foliyo-api.onrender.com" — no trailing slash
-const API_BASE = import.meta.env.VITE_API_URL || ''
+export const API_BASE = import.meta.env.VITE_API_URL || ''
 
 async function apiFetch(path, params = {}) {
   const url = new URL(`${API_BASE}/api${path}`, API_BASE || window.location.origin)
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v)
   })
-  const res = await fetch(url.toString(), { signal: AbortSignal.timeout(12000) })
+  const res = await fetch(url.toString(), { signal: AbortSignal.timeout(path.startsWith('/ysx') ? 30000 : 12000) })
   const json = await res.json()
   if (!res.ok) throw Object.assign(new Error(json.error || `API ${res.status}`), { status: res.status })
   return json
@@ -41,6 +41,12 @@ export const api = {
       lastUpdated: b.lastUpdated ?? a.lastUpdated,
     }
   },
+
+  /** Yangon Stock Exchange — daily history from ysx-mm.com (first call per code can take ~10 s) */
+  ysxHistory: (code, days = 30) => apiFetch('/ysx/history', { code, days }),
+
+  /** Yangon Stock Exchange — latest session for every listing */
+  ysxQuotes: () => apiFetch('/ysx/quotes'),
 
   /** Historical chart data (Twelve Data → Finnhub fallback) */
   chart: (symbol, range = '1M') => apiFetch('/chart', { symbol, range }),

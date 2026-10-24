@@ -6,13 +6,14 @@ import { stocks } from '../data/mockData'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
 import PageHeader from '../components/PageHeader'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart as RPie, Pie, Cell } from 'recharts'
+import { persist } from '../utils/userStore'
 
 const COLORS = ['#e8a43e','#6fa3b8','#8fb38a','#d9805c','#d8c7a6','#c98a6b','#3f6f82']
 
 /* ── localStorage ────────────────────────────────────────────── */
 const KEY = 'foliyo_portfolio'
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || '[]') } catch { return [] } }
-const save = d => localStorage.setItem(KEY, JSON.stringify(d))
+const save = d => persist(KEY, d)
 
 /* ── Deterministic portfolio history ─────────────────────────── */
 function buildHistory(holdings, days = 180) {

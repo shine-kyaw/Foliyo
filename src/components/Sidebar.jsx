@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, LogIn, UserPlus, LogOut, User, Sun, Moon, Monitor, Type, Palette, ChevronRight, Eye, EyeOff, Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useApp } from '../context/AppContext'
 import { useQuote } from '../hooks/useQuote'
@@ -71,19 +71,56 @@ function AlertsPreview() {
   )
 }
 
+/* Google Identity Services button — Google renders it and hands back a signed ID token */
+let gsiScript
+function loadGsi() {
+  gsiScript ||= new Promise((resolve, reject) => {
+    const el = document.createElement('script')
+    el.src = 'https://accounts.google.com/gsi/client'
+    el.async = true
+    el.onload = resolve
+    el.onerror = () => { gsiScript = null; reject(new Error('Google sign-in didn’t load')) }
+    document.head.appendChild(el)
+  })
+  return gsiScript
+}
+
+function GoogleButton({ clientId, onCredential, theme, label }) {
+  const ref = useRef(null)
+  const cb = useRef(onCredential)
+  cb.current = onCredential
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    loadGsi().then(() => {
+      if (cancelled || !ref.current) return
+      window.google.accounts.id.initialize({ client_id: clientId, callback: r => cb.current(r.credential) })
+      ref.current.innerHTML = ''
+      window.google.accounts.id.renderButton(ref.current, {
+        theme: theme === 'light' ? 'outline' : 'filled_black', size: 'large', shape: 'rectangular',
+        text: label, width: Math.min(ref.current.offsetWidth || 320, 400),
+      })
+    }).catch(() => setFailed(true))
+    return () => { cancelled = true }
+  }, [clientId, theme, label])
+  if (failed) return <p className="text-xs" style={{ color:'var(--text-3)' }}>Google sign-in couldn’t load. Use email instead.</p>
+  return <div ref={ref} className="w-full min-h-[44px] flex justify-center" />
+}
+
 export default function Sidebar() {
   const {
     sidebarOpen, setSidebar,
     sidebarTab, setSidebarTab,
     authTab, setAuthTab,
-    user, authForm, setAuthForm, authError, authLoading,
-    handleSignIn, handleSignUp, handleGoogleSignIn, handleSignOut,
+    user, authChecked, accountConfig, authForm, setAuthForm, authError, authLoading,
+    handleSignIn, handleSignUp, handleGoogleCredential, handleSignOut, handleDeleteAccount,
     theme, setTheme, effectiveTheme,
     accent, setAccent, ACCENT_COLORS,
     fontSize, setFontSize,
   } = useApp()
 
   const [showPw, setShowPw] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const navigate = useNavigate()
 
   return (
@@ -158,13 +195,54 @@ export default function Sidebar() {
                           ))}
                         </div>
 
+                        <p className="text-xs mt-4 leading-relaxed" style={{ color:'var(--text-3)' }}>
+                          Your watchlist, portfolio, simulator and alerts are saved to this account and follow you to any device.
+                        </p>
+
                         <button onClick={handleSignOut}
                           className="w-full mt-6 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-bold transition-colors"
-                          style={{ background:'rgb(var(--down) / .1)', color:'rgb(var(--down))', border:'1px solid rgb(var(--down) / .2)' }}>
-                          <LogOut size={15} /> Sign Out
+                          style={{ background:'var(--bg-2)', color:'var(--text-1)', border:'1px solid var(--border-light)' }}>
+                          <LogOut size={15} /> Sign out
                         </button>
+
+                        <div className="mt-8 pt-5 border-t" style={{ borderColor:'var(--border)' }}>
+                          {!confirmDelete ? (
+                            <button onClick={() => setConfirmDelete(true)} className="text-xs font-semibold hover:underline"
+                              style={{ color:'rgb(var(--down))' }}>
+                              Delete account
+                            </button>
+                          ) : (
+                            <div className="space-y-3">
+                              <p className="text-xs leading-relaxed" style={{ color:'var(--text-2)' }}>
+                                This permanently deletes your account, saved data and alerts. It can’t be undone.
+                              </p>
+                              <div className="flex gap-2">
+                                <button onClick={handleDeleteAccount} disabled={authLoading}
+                                  className="flex-1 py-2 rounded-md text-xs font-bold disabled:opacity-60"
+                                  style={{ background:'rgb(var(--down) / .12)', color:'rgb(var(--down))', border:'1px solid rgb(var(--down) / .3)' }}>
+                                  Delete permanently
+                                </button>
+                                <button onClick={() => setConfirmDelete(false)} className="btn-ghost flex-1 justify-center !py-2 text-xs">Keep account</button>
+                              </div>
+                              {authError && <p role="alert" className="text-xs text-red-400 font-medium">{authError}</p>}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
+                    ) : !authChecked || !accountConfig ? (
+                      <div className="flex items-center justify-center gap-2 py-12 text-sm" style={{ color:'var(--text-3)' }}>
+                        <Loader2 size={15} className="animate-spin" /> Checking your account…
+                      </div>
+                    ) : !accountConfig.enabled ? (
+                      <div className="rounded-lg border p-4 text-sm leading-relaxed" style={{ background:'var(--bg-2)', borderColor:'var(--border)', color:'var(--text-2)' }}>
+                        <div className="font-bold mb-1.5" style={{ color:'var(--text-1)' }}>
+                          {accountConfig.unreachable ? 'Can’t reach the account server' : 'Accounts aren’t switched on yet'}
+                        </div>
+                        {accountConfig.unreachable
+                          ? 'It may be waking up. Close this panel and try again in a minute.'
+                          : 'Everything still works without one — your watchlist, portfolio and alerts are saved in this browser.'}
+                      </div>
                     ) : (
                       <div>
                         {/* Sign-in / Sign-up toggle */}
@@ -179,24 +257,18 @@ export default function Sidebar() {
                           ))}
                         </div>
 
-                        {/* Google Sign-in button */}
-                        <button
-                          onClick={handleGoogleSignIn}
-                          disabled={authLoading}
-                          className="btn-ghost w-full justify-center gap-2.5 py-2.5 mb-4 disabled:opacity-60"
-                          style={{ color:'var(--text-1)' }}>
-                          {authLoading
-                            ? <><Loader2 size={15} className="animate-spin" /> Signing in…</>
-                            : <><GoogleIcon /> Continue with Google</>
-                          }
-                        </button>
-
-                        {/* Divider */}
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="flex-1 h-px" style={{ background:'var(--border)' }}/>
-                          <span className="text-xs font-medium" style={{ color:'var(--text-3)' }}>or</span>
-                          <div className="flex-1 h-px" style={{ background:'var(--border)' }}/>
-                        </div>
+                        {/* Google Sign-in — only when the server has a Google client id */}
+                        {accountConfig.google && (
+                          <>
+                            <GoogleButton clientId={accountConfig.google} onCredential={handleGoogleCredential}
+                              theme={effectiveTheme} label={authTab === 'signup' ? 'signup_with' : 'continue_with'} />
+                            <div className="flex items-center gap-3 my-4">
+                              <div className="flex-1 h-px" style={{ background:'var(--border)' }}/>
+                              <span className="text-xs font-medium" style={{ color:'var(--text-3)' }}>or</span>
+                              <div className="flex-1 h-px" style={{ background:'var(--border)' }}/>
+                            </div>
+                          </>
+                        )}
 
                         <AnimatePresence mode="wait">
                           {/* Sign In */}
@@ -206,14 +278,14 @@ export default function Sidebar() {
                               className="space-y-4">
                               <div>
                                 <label htmlFor="si-email" className="block text-xs font-semibold mb-1.5" style={{ color:'var(--text-2)' }}>Email</label>
-                                <input id="si-email" className="input" type="email" placeholder="you@example.com"
+                                <input id="si-email" className="input" type="email" autoComplete="email" placeholder="you@example.com"
                                   value={authForm.email}
                                   onChange={e => setAuthForm(f => ({ ...f, email: e.target.value }))} />
                               </div>
                               <div>
                                 <label htmlFor="si-password" className="block text-xs font-semibold mb-1.5" style={{ color:'var(--text-2)' }}>Password</label>
                                 <div className="relative">
-                                  <input id="si-password" className="input pr-10" type={showPw ? 'text' : 'password'} placeholder="••••••••"
+                                  <input id="si-password" autoComplete="current-password" className="input pr-10" type={showPw ? 'text' : 'password'} placeholder="••••••••"
                                     value={authForm.password}
                                     onChange={e => setAuthForm(f => ({ ...f, password: e.target.value }))} />
                                   <button type="button" onClick={() => setShowPw(!showPw)}
@@ -225,8 +297,8 @@ export default function Sidebar() {
                                 </div>
                               </div>
                               {authError && <p role="alert" className="text-xs text-red-400 font-medium">{authError}</p>}
-                              <button type="submit" className="btn-primary w-full justify-center py-3 mt-1">
-                                <LogIn size={14} /> Sign In
+                              <button type="submit" disabled={authLoading} className="btn-primary w-full justify-center py-3 mt-1">
+                                {authLoading ? <><Loader2 size={14} className="animate-spin" /> Signing in…</> : <><LogIn size={14} /> Sign in</>}
                               </button>
                               <p className="text-xs text-center" style={{ color:'var(--text-3)' }}>
                                 No account?{' '}
@@ -258,7 +330,7 @@ export default function Sidebar() {
                               <div>
                                 <label htmlFor="su-password" className="block text-xs font-semibold mb-1.5" style={{ color:'var(--text-2)' }}>Password</label>
                                 <div className="relative">
-                                  <input id="su-password" className="input pr-10" type={showPw ? 'text' : 'password'} placeholder="Choose a password"
+                                  <input id="su-password" autoComplete="new-password" minLength={8} className="input pr-10" type={showPw ? 'text' : 'password'} placeholder="At least 8 characters"
                                     value={authForm.password}
                                     onChange={e => setAuthForm(f => ({ ...f, password: e.target.value }))} />
                                   <button type="button" onClick={() => setShowPw(!showPw)}
@@ -270,8 +342,8 @@ export default function Sidebar() {
                                 </div>
                               </div>
                               {authError && <p role="alert" className="text-xs text-red-400 font-medium">{authError}</p>}
-                              <button type="submit" className="btn-primary w-full justify-center py-3 mt-1">
-                                <UserPlus size={14} /> Create Account
+                              <button type="submit" disabled={authLoading} className="btn-primary w-full justify-center py-3 mt-1">
+                                {authLoading ? <><Loader2 size={14} className="animate-spin" /> Creating account…</> : <><UserPlus size={14} /> Create account</>}
                               </button>
                               <p className="text-xs text-center" style={{ color:'var(--text-3)' }}>
                                 Already have one?{' '}

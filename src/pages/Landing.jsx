@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion'
 import { ArrowRight, ArrowUpRight, Search, X } from 'lucide-react'
-import { usStocks, euStocks, asiaStocks, aiAlerts } from '../data/mockData'
+import { usStocks, euStocks, asiaStocks } from '../data/mockData'
+import { useSignals } from '../hooks/useSignals'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
 import { useLiveIndices } from '../hooks/useLiveIndices'
 import { useChart } from '../hooks/useChart'
@@ -246,13 +247,9 @@ export default function Landing() {
     initial: { opacity:0, y:18 }, animate: { opacity:1, y:0 }, transition: { duration:0.6, delay, ease },
   }
 
-  /* Live overlay for the three sample signal cards */
-  const alertSymbols = aiAlerts.slice(0,3).map(a => a.symbol)
-  const { quotes: alertQuotes } = useBatchQuotes(alertSymbols, 60_000)
-  const liveAlerts = aiAlerts.slice(0,3).map(a => {
-    const q = alertQuotes[a.symbol]
-    return q ? { ...a, price: q.price } : { ...a, price: null }
-  })
+  /* Today's three strongest calls from the live rule-based screen */
+  const { signals } = useSignals()
+  const topSignals = signals.slice(0, 3)
 
   /* Index strip shows live values only — names with a dash until data lands */
   const { indices: liveIndices, isLive: indicesLive } = useLiveIndices(60_000)
@@ -384,11 +381,12 @@ export default function Landing() {
           <div className="lg:col-span-5">
             <div className="eyebrow mb-5">AI alerts</div>
             <h2 className="text-4xl font-black leading-[1.05] mb-5" style={{ color:'var(--text-1)' }}>
-              A call, a confidence score, and the <span className="lean" style={{ color:'var(--accent)' }}>why.</span>
+              A call, a score, and the <span className="lean" style={{ color:'var(--accent)' }}>why.</span>
             </h2>
             <p className="text-base leading-relaxed mb-8 max-w-md" style={{ color:'var(--text-2)' }}>
-              Each signal weighs recent momentum, valuation and sector conditions, then shows its reasoning
-              so you can disagree with it. A starting point for your own research — not financial advice.
+              Every large cap is scored on today’s live move and its valuation, then labelled buy, hold or sell with the
+              reasoning shown — so you can disagree with it. Set alerts on any stock and Foliyo tells you when they fire.
+              A starting point for your own research, not financial advice.
             </p>
             <Link to="/ai-alerts" className="btn-primary">
               See all signals <ArrowRight size={15}/>
@@ -396,7 +394,8 @@ export default function Landing() {
           </div>
 
           <div className="lg:col-span-7 space-y-3">
-            {liveAlerts.map((alert, i) => {
+            {!topSignals.length && [0,1,2].map(i => <div key={i} className="h-[92px] rounded-xl shimmer"/>)}
+            {topSignals.map((alert, i) => {
               const tone = alert.type === 'BUY' ? 'up' : alert.type === 'SELL' ? 'down' : 'caution'
               return (
                 <motion.div key={alert.id}
@@ -416,12 +415,14 @@ export default function Landing() {
                         <div className="text-sm" style={{ color: alert.price != null ? 'var(--text-1)' : 'var(--text-3)' }}>
                           {alert.price != null ? `$${alert.price.toFixed(2)}` : '—'}
                         </div>
-                        <div className="text-[11px]" style={{ color:'var(--text-3)' }}>{alert.confidence}% confidence</div>
+                        <div className={`text-[11px] ${alert.changePct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {alert.changePct >= 0 ? '+' : ''}{alert.changePct.toFixed(2)}% · score {alert.score > 0 ? '+' : ''}{alert.score}
+                        </div>
                       </div>
                     </div>
                     <div className="mt-3.5 h-[3px] rounded-full overflow-hidden" style={{ background:'var(--bg-3)' }}>
                       <motion.div className="h-full rounded-full"
-                        initial={reduce ? false : { width:0 }} whileInView={{ width:`${alert.confidence}%` }}
+                        initial={reduce ? false : { width:0 }} whileInView={{ width:`${Math.abs(alert.score) / 3 * 100}%` }}
                         viewport={{ once:true }} transition={{ delay: 0.3 + i * 0.1, duration:0.8, ease }}
                         style={{ background:`rgb(var(--${tone}))` }}/>
                     </div>

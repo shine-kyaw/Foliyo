@@ -7,9 +7,28 @@ import { generateAIAnalysis } from '../utils/aiAnalysis'
 import { api } from '../services/api'
 import { useQuote } from '../hooks/useQuote'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
+import { useAssetQuotes } from '../hooks/useAssetQuotes'
 import PageHeader from '../components/PageHeader'
+import { persist } from '../utils/userStore'
 
 const ALL_ASSETS = [...usStocks, ...euStocks, ...asiaStocks, ...cryptos, ...commodities, ...currencies]
+
+/* Crypto / commodities / FX never go through the equity quote endpoint.
+   Watchlist symbol → live-feed symbol; anything not listed has no live source. */
+const ASSET_FEED = {
+  BTC:'BTC/USD', ETH:'ETH/USD', SOL:'SOL/USD', DOGE:'DOGE/USD',
+  'GC=F':'XAU/USD', 'CL=F':'WTI/USD', 'NG=F':'NGAS/USD', 'ZW=F':'WHEAT/USD',
+  'EUR/USD':'EUR/USD', 'GBP/USD':'GBP/USD', 'USD/JPY':'USD/JPY', 'AUD/USD':'AUD/USD',
+}
+const ASSET_TYPE = {}
+cryptos.forEach(a => { ASSET_TYPE[a.symbol] = 'crypto' })
+commodities.forEach(a => { ASSET_TYPE[a.symbol] = 'commodity' })
+currencies.forEach(a => { ASSET_TYPE[a.symbol] = 'currency' })
+
+const liveQuoteFor = (symbol, feed) => feed[ASSET_FEED[symbol]] || null
+
+/* Non-stock tiles open their Global Markets board, not a stock page */
+const TILE_LINK = { crypto:'/global-markets?region=crypto', commodity:'/global-markets?region=commodities', currency:'/global-markets?region=forex' }
 
 const regionFlag = {}  // Region flags removed — region shows as a chip with text instead
 
@@ -20,7 +39,7 @@ const loadWatchlist = () => {
   catch { return new Set() }
 }
 const saveWatchlist = (set) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify([...set]))
+  persist(STORAGE_KEY, [...set])
 }
 
 /* ── watchlist-meta helpers (symbol → {name}) ──────────────── */
@@ -33,7 +52,7 @@ const wlSaveMeta = (symbol, name) => {
   try {
     const meta = wlLoadMeta()
     meta[symbol] = { name }
-    localStorage.setItem(META_KEY, JSON.stringify(meta))
+    persist(META_KEY, meta)
   } catch { /* ignore */ }
 }
 
@@ -85,6 +104,7 @@ function Sparkline({ id, price, changePct, width = 72, height = 28 }) {
 
 function fmtPrice(price, type) {
   if (type === 'currency') return price.toFixed(4)
+  if (type === 'crypto' && price < 1) return `$${price.toFixed(4)}`
   if (price >= 10000) return `$${price.toLocaleString('en-US', { maximumFractionDigits:0 })}`
   if (price >= 1000)  return `$${price.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })}`
   return `$${price.toFixed(2)}`
@@ -186,7 +206,7 @@ function AddStockSearch({ pinned, onAdd }) {
             style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
             {results.map((s, i) => {
               const isUp = (s.changePct ?? 0) >= 0
-              const hasPrice = typeof s.price === 'number'
+              const hasPrice = typeof s.price === 'number' && !ASSET_TYPE[s.symbol]  // no stale mock prices for crypto/commodities/FX
               return (
                 <button key={s.symbol} onMouseDown={() => handleSelect(s)}
                   className="w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors"
@@ -277,7 +297,7 @@ function AddStockSearch({ pinned, onAdd }) {
 }
 
 /* ── Pinned watchlist tile ─────────────────────────────────── */
-function WatchTile({ stock, onRemove }) {
+function WatchTile({ stock, type = 'stock', noLive, onRemove }) {
   const hasPrice = stock.price != null
   const up = hasPrice && stock.changePct >= 0
   const color = !hasPrice ? 'var(--text-3)' : up ? 'rgb(var(--up))' : 'rgb(var(--down))'
@@ -285,7 +305,7 @@ function WatchTile({ stock, onRemove }) {
 
   return (
     <div className="relative group">
-      <Link to={`/stock/${stock.symbol}`}>
+      <Link to={TILE_LINK[type] || `/stock/${encodeURIComponent(stock.symbol)}`}>
         <div
           className="rounded-xl p-4 h-full flex flex-col border transition-colors"
           style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}
@@ -308,10 +328,13 @@ function WatchTile({ stock, onRemove }) {
           </div>
           <div>
             <div className="font-black font-mono text-lg leading-none tracking-tight" style={{ color: hasPrice ? 'var(--text-1)' : 'var(--text-3)' }}>
-              {hasPrice ? fmtPrice(stock.price, 'stock') : '—'}
+              {hasPrice ? fmtPrice(stock.price, type) : '—'}
             </div>
             <div className="text-xs font-bold font-mono mt-1" style={{ color }}>
               {hasPrice ? `${up ? '+' : ''}${stock.changePct.toFixed(2)}%` : '—'}
+              {!hasPrice && noLive && (
+                <span className="font-normal ml-1.5 text-[10px] font-sans">No live price</span>
+              )}
               {hasPrice && stock.change != null && (
                 <span className="font-normal ml-1 opacity-70 font-mono">
                   {up ? '+' : ''}{stock.change.toFixed(2)}
@@ -333,27 +356,46 @@ function WatchTile({ stock, onRemove }) {
   )
 }
 
-/* ── Live wrapper for pinned tiles ─────────────────────────── */
-function LiveWatchTile({ symbol, onRemove }) {
-  const { quote } = useQuote(symbol)
+/* ── Live wrappers for pinned tiles ────────────────────────── */
+function tileBase(symbol) {
   const staticStock = ALL_ASSETS.find(s => s.symbol === symbol)
-  const meta = wlLoadMeta()
-  const name = staticStock?.name || meta[symbol]?.name || symbol
+  const name = staticStock?.name || wlLoadMeta()[symbol]?.name || symbol
+  return { symbol, name, sector: staticStock?.sector, region: staticStock?.region }
+}
+
+function StockWatchTile({ symbol, onRemove }) {
+  const { quote } = useQuote(symbol)
   /* Null prices until live data arrives — no mock fallback */
   const stock = {
-    symbol,
-    name,
+    ...tileBase(symbol),
     price:     quote?.price     ?? null,
     changePct: quote?.changePct ?? null,
     change:    quote?.change    ?? null,
-    sector:    staticStock?.sector,
-    region:    staticStock?.region,
   }
   return <WatchTile stock={stock} onRemove={onRemove}/>
 }
 
+function AssetWatchTile({ symbol, type, onRemove }) {
+  const { quotes, ready } = useAssetQuotes()
+  const q = liveQuoteFor(symbol, quotes)
+  const stock = {
+    ...tileBase(symbol),
+    price:     q?.price     ?? null,
+    changePct: q?.changePct ?? null,
+    change:    q?.change    ?? null,
+  }
+  return <WatchTile stock={stock} type={type} noLive={!q && (ready || !ASSET_FEED[symbol])} onRemove={onRemove}/>
+}
+
+function LiveWatchTile({ symbol, onRemove }) {
+  const type = ASSET_TYPE[symbol]
+  return type
+    ? <AssetWatchTile symbol={symbol} type={type} onRemove={onRemove}/>
+    : <StockWatchTile symbol={symbol} onRemove={onRemove}/>
+}
+
 /* ── Asset list row ────────────────────────────────────────── */
-function AssetRow({ item, type, inWatchlist, onAdd, onRemove, index }) {
+function AssetRow({ item, type, noLive, inWatchlist, onAdd, onRemove, index }) {
   const hasPrice = item.price != null
   const isUp     = hasPrice && item.changePct >= 0
   const isStock  = type === 'stock'
@@ -389,6 +431,9 @@ function AssetRow({ item, type, inWatchlist, onAdd, onRemove, index }) {
           {hasPrice && (isUp ? <TrendingUp size={9}/> : <TrendingDown size={9}/>)}
           {hasPrice ? `${isUp ? '+' : ''}${item.changePct.toFixed(2)}%` : '—'}
         </div>
+        {!hasPrice && noLive && (
+          <div className="text-[10px] mt-0.5" style={{ color:'var(--text-3)' }}>No live price</div>
+        )}
       </div>
       <button
         onClick={e => { e.preventDefault(); e.stopPropagation(); inWatchlist ? onRemove(item.symbol) : onAdd(item.symbol) }}
@@ -405,7 +450,7 @@ function AssetRow({ item, type, inWatchlist, onAdd, onRemove, index }) {
 }
 
 /* ── Section wrapper ───────────────────────────────────────── */
-function SectionList({ title, items, type, flag, pinned, onAdd, onRemove }) {
+function SectionList({ title, items, type, noLive, flag, pinned, onAdd, onRemove }) {
   if (!items.length) return null
   return (
     <div className="mb-5">
@@ -418,7 +463,7 @@ function SectionList({ title, items, type, flag, pinned, onAdd, onRemove }) {
       <div className="rounded-xl overflow-hidden border"
         style={{ borderColor:'var(--border)', background:'var(--bg-1)' }}>
         {items.map((item, i) => (
-          <AssetRow key={item.symbol} item={item} type={type} index={i}
+          <AssetRow key={item.symbol} item={item} type={type} noLive={noLive} index={i}
             inWatchlist={pinned.has(item.symbol)} onAdd={onAdd} onRemove={onRemove}/>
         ))}
       </div>
@@ -448,22 +493,6 @@ export default function Watchlist() {
   const addPin    = s => setPinned(p => new Set([...p, s]))
   const removePin = s => setPinned(p => { const n = new Set(p); n.delete(s); return n })
 
-  const wlMeta = wlLoadMeta()
-  const pinnedItems = [...pinned].map(sym => {
-    const found = ALL_ASSETS.find(s => s.symbol === sym)
-    if (found) return found
-    const meta = wlMeta[sym]
-    return meta ? { symbol: sym, name: meta.name, price: 0, changePct: 0, change: 0 } : null
-  }).filter(Boolean)
-  const stockPinned  = pinnedItems.filter(s => s.sector)
-  const bestToday    = stockPinned.length ? stockPinned.reduce((a, b) => a.changePct > b.changePct ? a : b) : null
-  const worstToday   = stockPinned.length ? stockPinned.reduce((a, b) => a.changePct < b.changePct ? a : b) : null
-
-  const filterBySearch = arr => !search ? arr : arr.filter(i =>
-    i.symbol.toLowerCase().includes(search.toLowerCase()) ||
-    i.name.toLowerCase().includes(search.toLowerCase())
-  )
-
   /* Live overlay for stock symbols in the asset browser */
   const stockSymbols = [...usStocks, ...euStocks, ...asiaStocks].map(s => s.symbol)
   const { quotes: assetQuotes } = useBatchQuotes(stockSymbols, 60_000)
@@ -473,14 +502,42 @@ export default function Watchlist() {
       ? { ...s, price: q.price, change: q.change, changePct: q.changePct }
       : { ...s, price: null, change: null, changePct: null }
   })
+  const { quotes: feedQuotes, ready: feedReady } = useAssetQuotes()
+
+  const wlMeta = wlLoadMeta()
+  const pinnedItems = [...pinned].map(sym => {
+    const found = ALL_ASSETS.find(s => s.symbol === sym)
+    if (found) return found
+    const meta = wlMeta[sym]
+    return meta ? { symbol: sym, name: meta.name, price: 0, changePct: 0, change: 0 } : null
+  }).filter(Boolean)
+  const stockPinned  = pinnedItems
+    .filter(s => s.sector)
+    .map(s => ({ ...s, changePct: assetQuotes[s.symbol]?.changePct }))
+    .filter(s => Number.isFinite(s.changePct))   // only stocks with a live quote
+  const bestToday    = stockPinned.length ? stockPinned.reduce((a, b) => a.changePct > b.changePct ? a : b) : null
+  const worstToday   = stockPinned.length ? stockPinned.reduce((a, b) => a.changePct < b.changePct ? a : b) : null
+
+  const filterBySearch = arr => !search ? arr : arr.filter(i =>
+    i.symbol.toLowerCase().includes(search.toLowerCase()) ||
+    i.name.toLowerCase().includes(search.toLowerCase())
+  )
+
+  /* Live overlay for crypto / commodities / FX — rows without a live source show "—" */
+  const overlayAsset = arr => arr.map(s => {
+    const q = liveQuoteFor(s.symbol, feedQuotes)
+    return q
+      ? { ...s, price: q.price, change: q.change, changePct: q.changePct }
+      : { ...s, price: null, change: null, changePct: null }
+  })
 
   const sections = [
     { key:'us',          title:'United States',   items:filterBySearch(overlay(usStocks)),   type:'stock' },
     { key:'eu',          title:'Europe',           items:filterBySearch(overlay(euStocks)),   type:'stock' },
     { key:'asia',        title:'Asia Pacific',     items:filterBySearch(overlay(asiaStocks)), type:'stock' },
-    { key:'commodities', title:'Commodities',      items:filterBySearch(commodities), type:'commodity' },
-    { key:'currencies',  title:'Currencies / FX',  items:filterBySearch(currencies),  type:'currency' },
-    { key:'crypto',      title:'Cryptocurrency',   items:filterBySearch(cryptos),     type:'crypto' },
+    { key:'commodities', title:'Commodities',      items:filterBySearch(overlayAsset(commodities)), type:'commodity' },
+    { key:'currencies',  title:'Currencies / FX',  items:filterBySearch(overlayAsset(currencies)),  type:'currency' },
+    { key:'crypto',      title:'Cryptocurrency',   items:filterBySearch(overlayAsset(cryptos)),     type:'crypto' },
   ]
 
   const visibleSections  = tab === 'all' ? sections : sections.filter(s => s.key === tab)
@@ -599,7 +656,7 @@ export default function Watchlist() {
           initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}
           transition={{ duration:0.18 }}>
           {visibleSections.map(s => (
-            <SectionList key={s.key} title={s.title} items={s.items} type={s.type}
+            <SectionList key={s.key} title={s.title} items={s.items} type={s.type} noLive={s.type !== 'stock' && feedReady}
               flag={s.flag} pinned={pinned} onAdd={addPin} onRemove={removePin}/>
           ))}
           {totalCount === 0 && (

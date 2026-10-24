@@ -3,7 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { TrendingUp, TrendingDown, AlertTriangle, RefreshCw, Clock, Loader2 } from 'lucide-react'
 import { usStocks, euStocks, asiaStocks, commodities, currencies, cryptos } from '../data/mockData'
-import { ysxStocks, ysxMarketStats } from '../data/myanmarStocks'
+import { ysxStocks, ysxMarketStats, fmtMktCap, YSX_URL } from '../data/myanmarStocks'
+import { useYsxQuotes, withQuote } from '../hooks/useYsx'
 import { api } from '../services/api'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
 import { fmtPrice as fmtPriceLive, fmtPct, fmtChange, changeColor } from '../utils/formatLive'
@@ -245,6 +246,10 @@ const SECTOR_COLORS = {
   'Communication':    '#e8a43e','Consumer Staples':'#d8c7a6',
 }
 function MyanmarTab() {
+  const { quotes, asOf, loading } = useYsxQuotes()
+  const merged = ysxStocks.map(s => withQuote(s, quotes[s.code]))
+  const isLive = merged.some(s => s.live)
+  const totalCap = fmtMktCap(merged.reduce((sum, s) => sum + s.shares * s.price, 0), 1)
   return (
     <div>
       {/* Disclaimer banner */}
@@ -252,8 +257,10 @@ function MyanmarTab() {
         style={{ background:'rgb(var(--caution) / .06)', borderColor:'rgb(var(--caution) / .2)', color:'rgb(var(--caution))' }}>
         <AlertTriangle size={13} className="shrink-0 mt-0.5"/>
         <span>
-          YSX data may be delayed or limited. Prices are based on latest available YSX publications — not real-time.
-          Verify at <a href="https://www.ysx.com.mm" target="_blank" rel="noopener noreferrer" className="underline font-semibold">ysx.com.mm</a>.
+          {isLive
+            ? <>End-of-day closes from the Yangon Stock Exchange (latest session <span className="font-mono">{asOf}</span>), not real-time.</>
+            : <>{loading ? 'Loading closes from the Yangon Stock Exchange. ' : 'Couldn’t load live closes from the Yangon Stock Exchange. '}Showing the last known closes (<span className="font-mono">{merged[0].date}</span>), which may be out of date.</>}
+          {' '}Verify at <a href={YSX_URL} target="_blank" rel="noopener noreferrer" className="underline font-semibold">ysx-mm.com</a>.
           This is informational only, not financial advice.
         </span>
       </div>
@@ -262,23 +269,24 @@ function MyanmarTab() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
         {[
           { label:'Listed companies', value:ysxMarketStats.totalListings, sub:'all sectors' },
-          { label:'Market Index (MMI)', value:ysxMarketStats.indexValue, sub:ysxMarketStats.indexChange },
-          { label:'Market cap', value:ysxMarketStats.totalMktCap, sub:'approx.' },
+          { label:'Latest session', value:isLive ? asOf : merged[0].date, sub:isLive ? 'live from YSX' : 'saved snapshot' },
+          { label:'Market cap', value:totalCap, sub:'shares × close' },
           { label:'Trading hours', value:'09:30 – 12:30', sub:'MMT (UTC+6:30)' },
         ].map(c => (
           <div key={c.label} className="rounded-xl border px-4 py-3"
             style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
             <div className="text-xs" style={{ color:'var(--text-3)' }}>{c.label}</div>
             <div className="font-black font-mono text-base mt-0.5" style={{ color:'var(--text-1)' }}>{c.value}</div>
-            <div className="text-xs font-mono" style={{ color: c.sub === ysxMarketStats.indexChange ? (String(c.sub).trim().startsWith('-') ? 'rgb(var(--down))' : 'rgb(var(--up))') : 'var(--text-3)' }}>{c.sub}</div>
+            <div className="text-xs font-mono" style={{ color:'var(--text-3)' }}>{c.sub}</div>
           </div>
         ))}
       </div>
 
       {/* YSX stock grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {ysxStocks.map((stock, i) => {
-          const up = stock.changePct >= 0
+        {merged.map((stock, i) => {
+          const hasChange = stock.changePct != null
+          const up = (stock.changePct ?? 0) >= 0
           const sectorColor = SECTOR_COLORS[stock.sector] || '#857f73'
           return (
             <motion.div key={stock.code} initial={{ opacity:0, y:10 }} animate={{ opacity:1, y:0 }} transition={{ delay: i * 0.05 }}>
@@ -310,13 +318,19 @@ function MyanmarTab() {
                 <div className="font-black font-mono text-base" style={{ color:'var(--text-1)' }}>
                   {stock.price.toLocaleString()} MMK
                 </div>
-                <div className="text-xs font-mono mb-2" style={{ color:'var(--text-3)' }}>≈ ${stock.priceUSD.toFixed(2)} USD</div>
-                <div className={`text-sm font-bold font-mono flex items-center gap-1 ${up ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {up ? <TrendingUp size={12}/> : <TrendingDown size={12}/>}
-                  {up ? '+' : ''}{stock.changePct.toFixed(2)}%
+                <div className="text-xs mb-2" style={{ color:'var(--text-3)' }}>
+                  {stock.live ? 'Close' : 'Last known close'} <span className="font-mono">{stock.date}</span>
                 </div>
+                {hasChange ? (
+                  <div className={`text-sm font-bold font-mono flex items-center gap-1 ${up ? 'text-emerald-400' : 'text-red-400'}`}>
+                    {up ? <TrendingUp size={12}/> : <TrendingDown size={12}/>}
+                    {up ? '+' : ''}{stock.changePct.toFixed(2)}%
+                  </div>
+                ) : (
+                  <div className="text-xs" style={{ color:'var(--text-3)' }}>{stock.live ? 'No change data' : 'Live change unavailable'}</div>
+                )}
                 <div className="mt-2 text-xs font-mono" style={{ color:'var(--text-3)' }}>
-                  Vol: {stock.volume.toLocaleString()} · Cap: {stock.mktCap}
+                  {stock.volume != null && <>Vol: {stock.volume.toLocaleString()} · </>}Cap: {stock.mktCap}
                 </div>
               </Link>
             </motion.div>
@@ -398,7 +412,7 @@ export default function GlobalMarkets() {
               mockFallback={mockCrypto}
               priceDecimals={2}
               label="Cryptocurrency"
-              note="BTC, ETH, SOL, BNB, XRP and DOGE, priced via Twelve Data"
+              note="BTC, ETH, SOL and DOGE, priced via Twelve Data"
             />
           )}
           {region === 'forex'       && (

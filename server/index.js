@@ -8,6 +8,13 @@ import fundamentalsRouter from './routes/fundamentals.js'
 import searchRouter       from './routes/search.js'
 import globalRouter       from './routes/global.js'
 import trendingRouter     from './routes/trending.js'
+import ysxRouter          from './routes/ysx.js'
+import accountRouter      from './routes/account.js'
+import alertsRouter       from './routes/alerts.js'
+import { dbEnabled, migrate } from './db.js'
+import { authEnabled } from './auth.js'
+import { mailEnabled } from './mailer.js'
+import { startAlertWorker } from './alertWorker.js'
 
 const app  = express()
 const PORT = process.env.API_PORT || 3001
@@ -21,7 +28,8 @@ app.use(cors({
   ].filter(Boolean),
   credentials: true,
 }))
-app.use(express.json())
+app.set('trust proxy', 1)   // Render sits behind a proxy; needed for per-IP throttling
+app.use(express.json({ limit: '256kb' }))
 
 // ── API Routes ────────────────────────────────────────────────
 app.use('/api/quote',        quoteRouter)
@@ -33,6 +41,9 @@ app.use('/api/fundamentals', fundamentalsRouter)
 app.use('/api/search',       searchRouter)
 app.use('/api',              globalRouter)  // /api/commodities, /api/crypto, /api/forex
 app.use('/api/stocks',       trendingRouter)// /api/stocks/trending, /api/stocks/indices
+app.use('/api/ysx',          ysxRouter)     // real Yangon Stock Exchange history
+app.use('/api/auth',         accountRouter) // sign-in, profile, synced data
+app.use('/api/alerts',       alertsRouter)  // signed-in users' alerts
 
 // ── Health check ──────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
@@ -44,7 +55,14 @@ app.get('/api/health', (_req, res) => {
       twelveData:   !!process.env.TWELVE_DATA_API_KEY,
       alphaVantage: !!process.env.ALPHA_VANTAGE_API_KEY,
     },
+    accounts: { database: dbEnabled, auth: authEnabled, google: !!process.env.GOOGLE_CLIENT_ID, email: mailEnabled },
   })
+})
+
+// ── Errors — always JSON, never a stack trace ─────────────────
+app.use((err, _req, res, _next) => {
+  console.error(err)
+  res.status(err.status || 500).json({ error: err.expose ? err.message : 'Something went wrong on our side. Try again.' })
 })
 
 // ── Local dev: start the HTTP server ─────────────────────────
@@ -59,6 +77,10 @@ if (!process.env.VERCEL) {
     // Warm cache at boot, then keep refreshing every 40 s (just before 45 s TTL)
     warmCache(apiKey)
     setInterval(() => warmCache(apiKey), 40_000)
+    console.log(`   Accounts:      ${dbEnabled && authEnabled ? '✓ configured' : '✗ set DATABASE_URL + AUTH_SECRET'}`)
+    migrate()
+      .then(startAlertWorker)
+      .catch(e => console.error('   Database migration failed:', e.message))
   })
 }
 

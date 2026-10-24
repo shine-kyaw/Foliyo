@@ -75,7 +75,7 @@ async function fetchOneQuote(symbol, apiKey) {
 /* Fetch symbols in chunks to stay under Finnhub's 60-req/min free-tier limit.
  * Cached hits are free (instant), so real-world chunk count is usually 1-2.
  * Chunk size 20, 100ms pause = fast first load, safe rate ceiling. */
-async function fetchAllQuotes(symbols, apiKey) {
+export async function fetchAllQuotes(symbols, apiKey) {
   const quotes = {}
   const CHUNK = 20
   const PAUSE = 100
@@ -92,7 +92,7 @@ async function fetchAllQuotes(symbols, apiKey) {
 const WARMUP_SYMBOLS = [
   'AAPL','MSFT','NVDA','GOOGL','TSLA','AMZN','META','NFLX',
   'AMD','ORCL','JPM','V','UNH','LLY','XOM','WMT','JNJ','PG',
-  'MA','HD','BRKB','CVX','MRK','ABBV','COST',
+  'MA','HD','BRK.B','CVX','MRK','ABBV','COST',
 ]
 
 export async function warmCache(apiKey) {

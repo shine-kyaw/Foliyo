@@ -1,15 +1,29 @@
 /**
  * Yangon Stock Exchange (YSX) listed companies.
- * Source: YSX official announcements and company disclosures.
+ * Source: Yangon Stock Exchange, https://ysx-mm.com (listing dates, shares outstanding, closing prices).
  *
- * NOTE: YSX does not offer a real-time public API. Prices and volumes
- * below are representative figures based on latest available YSX data.
- * Always check ysx.com.mm for the most current official data.
+ * The price, mktCap and date below are the 2026-10-23 close and only serve as the
+ * fallback when the live YSX call fails; the UI prefers live quotes (see hooks/useYsx.js).
+ * change / changePct / volume are null here because the snapshot has no prior-session figures.
  */
 
-export const DATA_SOURCE = 'YSX Official Data'
-export const DATA_NOTE   = 'Prices may be delayed. Source: Yangon Stock Exchange (ysx.com.mm)'
-export const DATA_DATE   = '2024 YSX Data'
+export const DATA_SOURCE = 'Yangon Stock Exchange (ysx-mm.com)'
+export const DATA_NOTE   = 'End-of-day prices from the Yangon Stock Exchange (ysx-mm.com), published after each session.'
+export const DATA_DATE   = '2026-10-23'
+
+export const YSX_URL = 'https://ysx-mm.com'
+
+export function fmtMktCap(shares, close) {
+  const v = shares * close
+  if (v >= 1e12) return `${(v / 1e12).toFixed(2)}T MMK`
+  return `${(v / 1e9).toFixed(1)}B MMK`
+}
+
+/** Registered on the Pre-Listing Board — not formally listed on the Main Board. */
+export const ysxPreListing = [
+  { code: 'MADPL', name: 'Myanma Agricultural & General Development Public Co.', registered: '2024-08-14' },
+  { code: 'ASPGB', name: 'G.B.S Agricultural Services Public Co.',               registered: '2025-12-17' },
+]
 
 export const ysxStocks = [
   {
@@ -19,13 +33,13 @@ export const ysxStocks = [
     sector: 'Diversified',
     subsector: 'Conglomerate',
     exchange: 'YSX',
-    price: 15500,            // MMK per share
-    priceUSD: 7.38,          // approximate USD
-    change: 200,
-    changePct: 1.31,
-    volume: 4820,
-    mktCap: '555B MMK',
-    sharesOutstanding: '35.8M',
+    price: 19000,            // MMK per share, close of 2026-10-23
+    change: null,
+    changePct: null,
+    volume: null,
+    mktCap: '629.1B MMK',
+    sharesOutstanding: '33.1M',
+    shares: 33109694,
     listedDate: '2016-03-25',
     currency: 'MMK',
     description: 'First Myanmar Investment Public Company Limited (FMI) is Myanmar\'s premier diversified conglomerate, with significant interests across financial services, real estate, hospitality, healthcare, and consumer goods. Founded in 1992, FMI was among the first major private companies in Myanmar and was the first company to list on the Yangon Stock Exchange in March 2016.',
@@ -51,13 +65,13 @@ export const ysxStocks = [
     sector: 'Industrials',
     subsector: 'Special Economic Zone',
     exchange: 'YSX',
-    price: 18200,
-    priceUSD: 8.67,
-    change: -150,
-    changePct: -0.82,
-    volume: 2340,
-    mktCap: '182B MMK',
-    sharesOutstanding: '10M',
+    price: 8500,            // MMK per share, close of 2026-10-23
+    change: null,
+    changePct: null,
+    volume: null,
+    mktCap: '330.9B MMK',
+    sharesOutstanding: '38.9M',
+    shares: 38929150,
     listedDate: '2016-05-20',
     currency: 'MMK',
     description: 'Myanmar Thilawa SEZ Holdings owns and develops land within the Thilawa Special Economic Zone, a major industrial park located 25 km south of Yangon. Thilawa SEZ is a joint venture between Myanmar and Japan and is one of Southeast Asia\'s most strategically located industrial zones, serving as a key gateway for foreign direct investment into Myanmar.',
@@ -83,14 +97,14 @@ export const ysxStocks = [
     sector: 'Financials',
     subsector: 'Commercial Bank',
     exchange: 'YSX',
-    price: 9800,
-    priceUSD: 4.67,
-    change: 50,
-    changePct: 0.51,
-    volume: 3100,
-    mktCap: '98B MMK',
-    sharesOutstanding: '10M',
-    listedDate: '2017-07-14',
+    price: 12500,            // MMK per share, close of 2026-10-23
+    change: null,
+    changePct: null,
+    volume: null,
+    mktCap: '130.0B MMK',
+    sharesOutstanding: '10.4M',
+    shares: 10400986,
+    listedDate: '2016-08-26',
     currency: 'MMK',
     description: 'Myanmar Citizens Bank (MCB) is one of Myanmar\'s established private commercial banks, providing retail, corporate, and SME banking services. Founded in 1992, MCB has grown its branch network across major cities and towns in Myanmar. The bank offers savings accounts, loans, trade finance, and remittance services.',
     website: '#',
@@ -115,14 +129,14 @@ export const ysxStocks = [
     sector: 'Financials',
     subsector: 'Commercial Bank',
     exchange: 'YSX',
-    price: 12400,
-    priceUSD: 5.90,
-    change: 100,
-    changePct: 0.81,
-    volume: 1850,
-    mktCap: '124B MMK',
-    sharesOutstanding: '10M',
-    listedDate: '2017-07-14',
+    price: 6800,            // MMK per share, close of 2026-10-23
+    change: null,
+    changePct: null,
+    volume: null,
+    mktCap: '211.8B MMK',
+    sharesOutstanding: '31.1M',
+    shares: 31144738,
+    listedDate: '2017-01-20',
     currency: 'MMK',
     description: 'First Private Bank Limited is one of Myanmar\'s oldest private sector banks, established in 1992. The bank provides comprehensive financial services including deposits, corporate loans, trade finance, foreign exchange, and retail banking. FPB has a growing ATM network and is expanding its digital banking capabilities.',
     website: '#',
@@ -147,14 +161,14 @@ export const ysxStocks = [
     sector: 'Communication',
     subsector: 'Telecommunications',
     exchange: 'YSX',
-    price: 7600,
-    priceUSD: 3.62,
-    change: -80,
-    changePct: -1.04,
-    volume: 5200,
-    mktCap: '76B MMK',
-    sharesOutstanding: '10M',
-    listedDate: '2019-09-24',
+    price: 3300,            // MMK per share, close of 2026-10-23
+    change: null,
+    changePct: null,
+    volume: null,
+    mktCap: '42.3B MMK',
+    sharesOutstanding: '12.8M',
+    shares: 12823224,
+    listedDate: '2018-01-26',
     currency: 'MMK',
     description: 'TMH Telecom Public Co. Ltd. provides telecommunications infrastructure and services in Myanmar. The company operates tower infrastructure, last-mile connectivity, and related telecommunications services. TMH benefits from Myanmar\'s ongoing telecommunications sector growth and mobile penetration expansion.',
     website: '#',
@@ -179,14 +193,14 @@ export const ysxStocks = [
     sector: 'Consumer Staples',
     subsector: 'Food & Beverage',
     exchange: 'YSX',
-    price: 6200,
-    priceUSD: 2.95,
-    change: 120,
-    changePct: 1.97,
-    volume: 2800,
-    mktCap: '62B MMK',
-    sharesOutstanding: '10M',
-    listedDate: '2020-09-18',
+    price: 1650,            // MMK per share, close of 2026-10-23
+    change: null,
+    changePct: null,
+    volume: null,
+    mktCap: '33.0B MMK',
+    sharesOutstanding: '20.0M',
+    shares: 19977223,
+    listedDate: '2020-05-28',
     currency: 'MMK',
     description: 'Ever Flow River Group is a consumer goods company operating in Myanmar\'s food, beverage, and consumer products sector. The company distributes and manufactures fast-moving consumer goods (FMCG) products targeting Myanmar\'s growing middle class. EFR operates across major cities and is expanding its rural distribution network.',
     website: '#',
@@ -211,14 +225,14 @@ export const ysxStocks = [
     sector: 'Industrials',
     subsector: 'Industrial Development',
     exchange: 'YSX',
-    price: 5400,
-    priceUSD: 2.57,
-    change: 0,
-    changePct: 0.0,
-    volume: 950,
-    mktCap: '54B MMK',
-    sharesOutstanding: '10M',
-    listedDate: '2021-03-26',
+    price: 4300,            // MMK per share, close of 2026-10-23
+    change: null,
+    changePct: null,
+    volume: null,
+    mktCap: '45.1B MMK',
+    sharesOutstanding: '10.5M',
+    shares: 10497598,
+    listedDate: '2021-06-03',
     currency: 'MMK',
     description: 'Amata Holding Public Company Limited is connected to the Amata Corporation, a Thailand-based industrial estate developer with operations in Thailand, Vietnam, and Myanmar. The Myanmar entity focuses on industrial land development and industrial park management, serving multinational and regional companies seeking manufacturing bases.',
     website: '#',
@@ -243,14 +257,14 @@ export const ysxStocks = [
     sector: 'Consumer Staples',
     subsector: 'Agricultural Trading',
     exchange: 'YSX',
-    price: 4800,
-    priceUSD: 2.29,
-    change: 60,
-    changePct: 1.27,
-    volume: 1650,
-    mktCap: '48B MMK',
-    sharesOutstanding: '10M',
-    listedDate: '2021-10-15',
+    price: 6400,            // MMK per share, close of 2026-10-23
+    change: null,
+    changePct: null,
+    volume: null,
+    mktCap: '152.4B MMK',
+    sharesOutstanding: '23.8M',
+    shares: 23804946,
+    listedDate: '2023-07-03',
     currency: 'MMK',
     description: 'Myanmar Agro Exchange Public Company Limited operates a commodities exchange platform for agricultural products in Myanmar. The company connects farmers, traders, and buyers of rice, pulses, sesame, and other key Myanmar agricultural commodities. MAEX plays a role in improving price transparency and market access for Myanmar\'s large agricultural sector.',
     website: '#',
@@ -274,15 +288,11 @@ export const ysxMarketStats = {
   exchange: 'Yangon Stock Exchange (YSX)',
   established: 'December 9, 2015',
   location: 'Yangon, Myanmar',
-  website: 'https://www.ysx.com.mm',
+  website: 'https://ysx-mm.com',
   currency: 'Myanmar Kyat (MMK)',
-  tradingHours: '9:30 AM – 12:30 PM ICT (Mon–Fri)',
-  timezone: 'ICT (UTC+6:30)',
+  tradingHours: '9:30 AM – 12:30 PM MMT (Mon–Fri)',
+  timezone: 'MMT (UTC+6:30)',
   totalListings: 8,
-  indexName: 'Myanmar Market Index (MMI)',
-  indexValue: '3,428.50',
-  indexChange: '+0.84%',
-  totalMktCap: '1,199B MMK',
-  avgDailyVolume: '23,000 shares',
+  totalMktCap: '1,574.5B MMK',
   dataNote: DATA_NOTE,
 }

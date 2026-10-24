@@ -7,47 +7,16 @@ import {
   Clock, AlertTriangle, Minus, Target,
   Shield, ChevronDown, ChevronUp,
 } from 'lucide-react'
-import { stocks as allStocks, aiAlerts as mockSignals } from '../data/mockData'
+import { stocks as allStocks } from '../data/mockData'
+import { useApp } from '../context/AppContext'
+import { useAlerts, requestBrowserNotifications, browserNotificationsState } from '../context/AlertsContext'
+import { useSignals } from '../hooks/useSignals'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
 import PageHeader, { StatusPill } from '../components/PageHeader'
 
 /* Segmented-control states, shared by every tab/chip group on this page */
 const SEG_ON  = { background:'rgba(var(--accent-rgb),.12)', color:'var(--text-1)', borderColor:'rgba(var(--accent-rgb),.25)' }
 const SEG_OFF = { background:'transparent', color:'var(--text-2)', borderColor:'var(--border)' }
-
-/* ── Persistence ─────────────────────────────────────────────── */
-const STORAGE_KEY = 'foliyo_user_alerts'
-
-const SEED_ALERTS = [
-  {
-    id: 'a1',
-    stock: { symbol:'AAPL', name:'Apple Inc.', price:189.84 },
-    type: 'price_above', targetValue: 210, targetSentiment: null,
-    notifMethod: 'both', status: 'active', createdAt: '2025-04-28T10:00:00Z',
-  },
-  {
-    id: 'a2',
-    stock: { symbol:'TSLA', name:'Tesla Inc.', price:248.42 },
-    type: 'price_below', targetValue: 220, targetSentiment: null,
-    notifMethod: 'email', status: 'active', createdAt: '2025-04-27T14:30:00Z',
-  },
-  {
-    id: 'a3',
-    stock: { symbol:'NVDA', name:'NVIDIA Corp.', price:877.35 },
-    type: 'daily_move', targetValue: 5, targetSentiment: null,
-    notifMethod: 'dashboard', status: 'paused', createdAt: '2025-04-26T09:15:00Z',
-  },
-]
-
-function loadAlerts() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? JSON.parse(raw) : SEED_ALERTS
-  } catch { return SEED_ALERTS }
-}
-function saveAlerts(alerts) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(alerts)) } catch {}
-}
 
 /* ── Config maps ─────────────────────────────────────────────── */
 const ALERT_TYPES = [
@@ -78,6 +47,7 @@ function conditionLabel(a) {
 
 function distanceLabel(a) {
   const cur = a.stock.price
+  if (cur == null) return 'Waiting for price'
   if (a.type === 'price_above') {
     const d = ((a.targetValue - cur) / cur * 100)
     return d > 0 ? `+${d.toFixed(1)}% away` : 'Target reached'
@@ -88,6 +58,12 @@ function distanceLabel(a) {
   }
   if (a.type === 'daily_move') return `±${a.targetValue}% threshold`
   return 'Monitoring'
+}
+
+function fmtDateTime(iso) {
+  try {
+    return new Date(iso).toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' })
+  } catch { return '' }
 }
 
 function fmtDate(iso) {
@@ -204,38 +180,44 @@ function StockSearchBox({ onSelect }) {
 
 /* ── Alert creation form ─────────────────────────────────────── */
 function CreateAlertPanel({ stock, onSave, onCancel }) {
+  const { user, accountConfig } = useApp()
+  const hasPrice = stock.price != null
   const [alertType, setAlertType] = useState('price_above')
-  const [targetVal,  setTargetVal] = useState(String((stock.price * 1.1).toFixed(2)))
+  const [targetVal,  setTargetVal] = useState(hasPrice ? String((stock.price * 1.1).toFixed(2)) : '')
   const [targetSent, setTargetSent] = useState('Bullish')
-  const [notifMethod, setNotifMethod] = useState('email')
+  const [notifMethod, setNotifMethod] = useState('browser')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
-  const requestBrowserPermission = async () => {
-    if (!('Notification' in window)) return false
-    if (Notification.permission === 'granted') return true
-    if (Notification.permission === 'denied') return false
-    const result = await Notification.requestPermission()
-    return result === 'granted'
-  }
+  // Email goes out from the API, so it needs an account and a configured mailbox
+  const emailReady = !!user && !!accountConfig?.emailAlerts
+  const emailNote = !user ? 'Sign in to get alerts by email.' : !accountConfig?.emailAlerts ? 'Email alerts aren’t switched on yet.' : null
+  const methodOk = m => emailReady || !['email', 'both'].includes(m)
 
   const handleCreate = async () => {
+    setError('')
+    const needsNum = ['price_above','price_below','daily_move'].includes(alertType)
+    const value = parseFloat(targetVal)
+    if (needsNum && !(value > 0)) { setError(alertType === 'daily_move' ? 'Enter a move size above 0%.' : 'Enter a target price above $0.'); return }
     setSaving(true)
     let finalMethod = notifMethod
     if (notifMethod === 'browser' || notifMethod === 'both') {
-      const granted = await requestBrowserPermission()
+      const granted = await requestBrowserNotifications()
       if (!granted) finalMethod = notifMethod === 'both' ? 'email' : 'dashboard'
     }
-    onSave({
-      id: `a${Date.now()}`,
-      stock: { symbol: stock.symbol, name: stock.name, price: stock.price },
-      type: alertType,
-      targetValue: alertType === 'daily_move' ? parseFloat(targetVal) || 5 : parseFloat(targetVal) || stock.price,
-      targetSentiment: targetSent,
-      notifMethod: finalMethod,
-      status: 'active',
-      createdAt: new Date().toISOString(),
-    })
-    setSaving(false)
+    try {
+      await onSave({
+        stock: { symbol: stock.symbol, name: stock.name, price: stock.price ?? null },
+        type: alertType,
+        targetValue: needsNum ? value : null,
+        targetSentiment: alertType === 'sentiment_change' ? targetSent : null,
+        notifMethod: finalMethod,
+      })
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const needsValue   = ['price_above','price_below','daily_move'].includes(alertType)
@@ -260,10 +242,12 @@ function CreateAlertPanel({ stock, onSave, onCancel }) {
           </div>
         </div>
         <div className="text-right">
-          <div className="font-mono font-bold" style={{ color:'var(--text-1)' }}>${stock.price.toFixed(2)}</div>
-          <div className={`text-xs font-bold font-mono ${stock.changePct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-            {stock.changePct >= 0 ? '+' : ''}{stock.changePct.toFixed(2)}% today
-          </div>
+          <div className="font-mono font-bold" style={{ color:'var(--text-1)' }}>{hasPrice ? `$${stock.price.toFixed(2)}` : '—'}</div>
+          {stock.changePct != null && (
+            <div className={`text-xs font-bold font-mono ${stock.changePct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              {stock.changePct >= 0 ? '+' : ''}{stock.changePct.toFixed(2)}% today
+            </div>
+          )}
         </div>
         <button onClick={onCancel} aria-label="Cancel" className="ml-3 p-1.5 rounded-lg hover:bg-white/5 transition-colors"
           style={{ color:'var(--text-3)' }}>
@@ -305,15 +289,15 @@ function CreateAlertPanel({ stock, onSave, onCancel }) {
               className="input text-sm pl-8 py-2.5 w-full font-mono"
               value={targetVal}
               onChange={e => setTargetVal(e.target.value)}
-              placeholder={alertType === 'daily_move' ? '5' : stock.price.toFixed(2)}
+              placeholder={alertType === 'daily_move' ? '5' : hasPrice ? stock.price.toFixed(2) : '0.00'}
             />
           </div>
-          {alertType === 'price_above' && parseFloat(targetVal) > 0 && (
+          {alertType === 'price_above' && hasPrice && parseFloat(targetVal) > 0 && (
             <p className="text-xs mt-1.5 font-mono" style={{ color:'var(--text-3)' }}>
               {((parseFloat(targetVal) - stock.price) / stock.price * 100).toFixed(1)}% above current price
             </p>
           )}
-          {alertType === 'price_below' && parseFloat(targetVal) > 0 && (
+          {alertType === 'price_below' && hasPrice && parseFloat(targetVal) > 0 && (
             <p className="text-xs mt-1.5 font-mono" style={{ color:'var(--text-3)' }}>
               {((stock.price - parseFloat(targetVal)) / stock.price * 100).toFixed(1)}% below current price
             </p>
@@ -347,22 +331,34 @@ function CreateAlertPanel({ stock, onSave, onCancel }) {
         <div className="text-xs font-bold uppercase tracking-wider mb-2.5" style={{ color:'var(--text-3)' }}>Notification Method</div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {NOTIF_METHODS.map(m => (
-            <button key={m.key} onClick={() => setNotifMethod(m.key)}
-              className="flex flex-col items-center gap-1.5 px-2 py-3 rounded-lg border transition-all"
+            <button key={m.key} onClick={() => setNotifMethod(m.key)} disabled={!methodOk(m.key)}
+              className="flex flex-col items-center gap-1.5 px-2 py-3 rounded-lg border transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               style={notifMethod === m.key ? SEG_ON : SEG_OFF}>
               <m.Icon size={15} style={notifMethod === m.key ? { color:'var(--accent)' } : undefined}/>
               <span className="text-xs font-semibold text-center leading-tight">{m.label}</span>
             </button>
           ))}
         </div>
+        <p className="text-xs mt-2" style={{ color:'var(--text-3)' }}>
+          {notifMethod === 'dashboard'
+            ? 'Shows on this page and as a notice inside Foliyo.'
+            : notifMethod === 'email'
+            ? 'Emailed to your account address when it triggers, even while Foliyo is closed.'
+            : browserNotificationsState() === 'denied'
+            ? 'Your browser is blocking notifications from Foliyo — allow them in site settings, or pick another option.'
+            : 'Your browser will ask to allow notifications. They appear while Foliyo is open in a tab.'}
+          {emailNote && <> {emailNote}</>}
+        </p>
       </div>
+
+      {error && <p role="alert" className="text-xs text-red-400 font-medium">{error}</p>}
 
       {/* Actions */}
       <div className="flex gap-3">
         <button onClick={handleCreate} disabled={saving}
           className="btn-primary flex-1 py-2.5 justify-center text-sm">
           <Plus size={14}/>
-          {saving ? 'Creating…' : 'Create Alert'}
+          {saving ? 'Creating…' : 'Create alert'}
         </button>
         <button onClick={onCancel}
           className="btn-ghost px-5 py-2.5 text-sm">
@@ -404,13 +400,15 @@ function AlertCard({ alert, onPause, onDelete }) {
 
         {/* Actions */}
         <div className="flex items-center gap-1.5 shrink-0">
-          <button onClick={() => onPause(alert.id)}
-            className="p-2 rounded-lg transition-all hover:bg-white/5"
-            title={alert.status === 'paused' ? 'Resume' : 'Pause'}
-            aria-label={alert.status === 'paused' ? 'Resume alert' : 'Pause alert'}
-            style={{ color:'var(--text-3)' }}>
-            {alert.status === 'paused' ? <Play size={14}/> : <Pause size={14}/>}
-          </button>
+          {alert.status !== 'triggered' && (
+            <button onClick={() => onPause(alert.id)}
+              className="p-2 rounded-lg transition-all hover:bg-white/5"
+              title={alert.status === 'paused' ? 'Resume' : 'Pause'}
+              aria-label={alert.status === 'paused' ? 'Resume alert' : 'Pause alert'}
+              style={{ color:'var(--text-3)' }}>
+              {alert.status === 'paused' ? <Play size={14}/> : <Pause size={14}/>}
+            </button>
+          )}
           <button onClick={() => onDelete(alert.id)} aria-label="Delete alert"
             className="p-2 rounded-lg transition-all hover:bg-red-400/10"
             style={{ color:'var(--text-3)' }}>
@@ -426,12 +424,23 @@ function AlertCard({ alert, onPause, onDelete }) {
         </p>
       </div>
 
+      {alert.status === 'triggered' && alert.triggerNote && (
+        <div className="mt-2 rounded-lg p-3 border text-sm" role="status"
+          style={{ background:'rgba(var(--accent-rgb),.07)', borderColor:'rgba(var(--accent-rgb),.25)', color:'var(--text-1)' }}>
+          <span className="font-semibold">Triggered {fmtDateTime(alert.triggeredAt)}</span> — {alert.triggerNote}.
+          {alert.emailedAt && <span style={{ color:'var(--text-3)' }}> Emailed.</span>}
+          <button onClick={() => onPause(alert.id)} className="block mt-1.5 text-xs font-semibold hover:underline" style={{ color:'var(--accent)' }}>
+            Watch again
+          </button>
+        </div>
+      )}
+
       {/* Metrics strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
         <div className="rounded-lg p-2.5 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
           <div className="text-xs mb-0.5" style={{ color:'var(--text-3)' }}>Current</div>
           <div className="text-sm font-mono font-bold" style={{ color:'var(--text-1)' }}>
-            ${alert.stock.price.toFixed(2)}
+            {alert.stock.price != null ? `$${Number(alert.stock.price).toFixed(2)}` : '—'}
           </div>
         </div>
         {(alert.type === 'price_above' || alert.type === 'price_below') && (
@@ -491,165 +500,128 @@ function AlertCard({ alert, onPause, onDelete }) {
   )
 }
 
-/* ── AI Signals tab content (preserved) ─────────────────────── */
+/* ── Signals — today's quotes run through the rule-based analysis ── */
 function AISignalsTab() {
+  const { signals, loading, lastUpdated } = useSignals()
   const [filter, setFilter] = useState('All')
   const [expanded, setExpanded] = useState(null)
 
   const typeStyle = {
-    BUY:  { color:'rgb(var(--up))',   bg:'rgb(var(--up) / .1)',      border:'rgb(var(--up) / .2)',      Icon:TrendingUp   },
-    SELL: { color:'rgb(var(--down))', bg:'rgb(var(--down) / .1)',    border:'rgb(var(--down) / .2)',    Icon:TrendingDown },
-    HOLD: { color:'rgb(var(--caution))',  bg:'rgb(var(--caution) / .1)', border:'rgb(var(--caution) / .2)', Icon:Minus        },
+    BUY:  { color:'rgb(var(--up))',      bg:'rgb(var(--up) / .1)',      border:'rgb(var(--up) / .2)',      Icon:TrendingUp   },
+    SELL: { color:'rgb(var(--down))',    bg:'rgb(var(--down) / .1)',    border:'rgb(var(--down) / .2)',    Icon:TrendingDown },
+    HOLD: { color:'rgb(var(--caution))', bg:'rgb(var(--caution) / .1)', border:'rgb(var(--caution) / .2)', Icon:Minus        },
   }
-  const confColor = (c) => c >= 85 ? 'rgb(var(--up))' : c >= 70 ? 'var(--accent)' : 'rgb(var(--down))'
   const counts = {
-    BUY:  mockSignals.filter(a => a.type==='BUY').length,
-    SELL: mockSignals.filter(a => a.type==='SELL').length,
-    HOLD: mockSignals.filter(a => a.type==='HOLD').length,
+    BUY:  signals.filter(a => a.type==='BUY').length,
+    SELL: signals.filter(a => a.type==='SELL').length,
+    HOLD: signals.filter(a => a.type==='HOLD').length,
   }
-  const filtered = filter === 'All' ? mockSignals : mockSignals.filter(a => a.type === filter)
+  const filtered = filter === 'All' ? signals : signals.filter(a => a.type === filter)
 
   return (
     <div className="space-y-5">
-      <p className="text-sm" style={{ color:'var(--text-2)' }}>
-        Example signals for illustration. They are not generated from live market data.
+      <p className="text-sm leading-relaxed" style={{ color:'var(--text-2)' }}>
+        Each US large cap is scored on today’s live move (up to ±2) and its P/E (±1). A total of +1 or more reads Buy,
+        −1 or less reads Sell, anything else Hold. It’s a quick screen, not a recommendation.
+        {lastUpdated && <span className="font-mono" style={{ color:'var(--text-3)' }}> Prices as of {new Date(lastUpdated).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' })}.</span>}
       </p>
 
       {/* Summary */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { type:'BUY',  label:'Buy',  color:'rgb(var(--up))',   bg:'rgb(var(--up) / .08)',      border:'rgb(var(--up) / .2)'      },
-          { type:'SELL', label:'Sell', color:'rgb(var(--down))', bg:'rgb(var(--down) / .08)',    border:'rgb(var(--down) / .2)'    },
-          { type:'HOLD', label:'Hold', color:'rgb(var(--caution))',  bg:'rgb(var(--caution) / .08)', border:'rgb(var(--caution) / .2)' },
-        ].map(s => (
-          <button key={s.type}
-            onClick={() => setFilter(filter === s.type ? 'All' : s.type)}
-            aria-pressed={filter === s.type}
-            className="rounded-xl p-4 text-center border transition-colors"
-            style={{ background:filter===s.type?s.bg:'var(--bg-2)', borderColor:filter===s.type?s.border:'var(--border)' }}>
-            <div className="text-3xl font-black font-mono" style={{ color:s.color }}>{counts[s.type]}</div>
-            <div className="text-xs font-semibold mt-1" style={{ color:s.color }}>{s.label}</div>
-          </button>
-        ))}
+          { type:'BUY',  label:'Buy'  },
+          { type:'SELL', label:'Sell' },
+          { type:'HOLD', label:'Hold' },
+        ].map(s => {
+          const ts = typeStyle[s.type]
+          return (
+            <button key={s.type}
+              onClick={() => setFilter(filter === s.type ? 'All' : s.type)}
+              aria-pressed={filter === s.type}
+              className="rounded-xl p-4 text-center border transition-colors"
+              style={{ background:filter===s.type?ts.bg:'var(--bg-2)', borderColor:filter===s.type?ts.border:'var(--border)' }}>
+              <div className="text-3xl font-black font-mono" style={{ color:ts.color }}>{counts[s.type]}</div>
+              <div className="text-xs font-semibold mt-1" style={{ color:ts.color }}>{s.label}</div>
+            </button>
+          )
+        })}
       </div>
 
-      {/* Filter pills */}
-      <div className="flex gap-2">
-        {['All','BUY','SELL','HOLD'].map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            className="text-xs px-4 py-2 rounded-md font-bold border transition-all"
-            style={filter === f ? SEG_ON : SEG_OFF}>
-            {f}{f !== 'All' && <span className="ml-1 opacity-60">{counts[f]}</span>}
-          </button>
-        ))}
-      </div>
+      {loading && (
+        <div className="space-y-3">{[0,1,2].map(i => <div key={i} className="h-24 rounded-xl shimmer"/>)}</div>
+      )}
+      {!loading && !signals.length && (
+        <div className="text-center py-14 text-sm" style={{ color:'var(--text-3)' }}>
+          No live prices yet, so there’s nothing to score. Refresh prices from the top bar in a minute.
+        </div>
+      )}
 
       {/* Signal cards */}
-      <div className="space-y-4">
-        {filtered.map((alert, i) => {
-          const ts = typeStyle[alert.type]
-          const isExp = expanded === alert.id
-          const toTarget = ((alert.target - alert.price) / alert.price) * 100
-          const upside = Math.abs(toTarget).toFixed(1)
+      <div className="space-y-3">
+        {filtered.map((sig, i) => {
+          const ts = typeStyle[sig.type]
+          const isExp = expanded === sig.id
           return (
-            <motion.div key={alert.id}
-              initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }} transition={{ delay:i*0.07 }}
+            <motion.div key={sig.id}
+              initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }} transition={{ delay: Math.min(i, 8) * 0.04 }}
               className="card-flat">
-              <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-4">
-                  <div className="w-11 h-11 rounded-lg flex items-center justify-center font-black shrink-0"
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="text-[11px] font-bold tracking-wider px-2 py-1 rounded w-12 text-center shrink-0"
                     style={{ background:ts.bg, color:ts.color, border:`1px solid ${ts.border}` }}>
-                    {alert.symbol.charAt(0)}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Link to={`/stock/${alert.symbol}`}
-                        className="font-black hover:text-accent transition-colors"
-                        style={{ color:'var(--text-1)' }}>{alert.symbol}</Link>
-                      <span className="text-xs font-black px-2 py-0.5 rounded-md"
-                        style={{ background:ts.bg, color:ts.color, border:`1px solid ${ts.border}` }}>
-                        <ts.Icon size={10} className="inline mr-0.5"/>{alert.type}
-                      </span>
-                      <span className="text-xs flex items-center gap-1 font-mono" style={{ color:'var(--text-3)' }}>
-                        <Clock size={9}/>{alert.timestamp}
-                      </span>
-                    </div>
-                    <div className="text-sm" style={{ color:'var(--text-3)' }}>{alert.name}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <div className="text-xs" style={{ color:'var(--text-3)' }}>Entry</div>
-                    <div className="font-black font-mono text-sm" style={{ color:'var(--text-1)' }}>${alert.price.toFixed(2)}</div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-xs" style={{ color:'var(--text-3)' }}>Target</div>
-                    <div className={`font-black font-mono text-sm ${alert.type==='SELL'?'text-red-400':'text-emerald-400'}`}>${alert.target.toFixed(2)}</div>
-                  </div>
-                  <div className="rounded-lg px-3 py-2 text-center" style={{ background:ts.bg, border:`1px solid ${ts.border}` }}>
-                    <div className="text-xs" style={{ color:'var(--text-3)' }}>To target</div>
-                    <div className="font-black text-sm font-mono" style={{ color:ts.color }}>
-                      {toTarget >= 0 ? '+' : '-'}{upside}%
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Confidence */}
-              <div className="mt-4">
-                <div className="flex justify-between mb-1.5 text-xs" style={{ color:'var(--text-3)' }}>
-                  <span>Confidence score</span><span className="font-mono">{alert.timeframe}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 rounded-full h-1.5 overflow-hidden" style={{ background:'var(--bg-3)' }}>
-                    <motion.div className="h-1.5 rounded-full"
-                      initial={{ width:0 }} animate={{ width:`${alert.confidence}%` }}
-                      transition={{ duration:0.9, ease:[0.22,1,0.36,1] }}
-                      style={{ background: confColor(alert.confidence) }}/>
-                  </div>
-                  <span className="text-xs font-black font-mono w-9 text-right"
-                    style={{ color: confColor(alert.confidence) }}>
-                    {alert.confidence}%
+                    {sig.type}
                   </span>
+                  <div className="min-w-0">
+                    <Link to={`/stock/${sig.symbol}`} className="font-black hover:text-accent transition-colors"
+                      style={{ color:'var(--text-1)' }}>{sig.symbol}</Link>
+                    <div className="text-xs truncate" style={{ color:'var(--text-3)' }}>{sig.name} · {sig.sector}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-5 font-mono text-sm">
+                  <div className="text-right">
+                    <div style={{ color:'var(--text-1)' }}>${sig.price.toFixed(2)}</div>
+                    <div className={`text-xs ${sig.changePct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {sig.changePct >= 0 ? '+' : ''}{sig.changePct.toFixed(2)}%
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[11px] font-sans" style={{ color:'var(--text-3)' }}>Score</div>
+                    <div className="font-bold" style={{ color:ts.color }}>{sig.score > 0 ? '+' : ''}{sig.score}</div>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 mt-3">
-                {alert.signals.map(s => <span key={s} className="badge-accent text-xs">{s}</span>)}
+              {/* Score bar: −3 … +3 */}
+              <div className="mt-3 relative h-1.5 rounded-full overflow-hidden" style={{ background:'var(--bg-3)' }}
+                aria-label={`Score ${sig.score} on a scale from −3 to +3`}>
+                <span className="absolute top-0 bottom-0 w-px left-1/2" style={{ background:'var(--border-light)' }}/>
+                <span className="absolute top-0 bottom-0 rounded-full"
+                  style={{ background:ts.color, left: sig.score >= 0 ? '50%' : `${50 + sig.score / 6 * 100}%`, width:`${Math.abs(sig.score) / 6 * 100}%` }}/>
               </div>
 
-              <button onClick={() => setExpanded(isExp ? null : alert.id)}
+              <button onClick={() => setExpanded(isExp ? null : sig.id)}
                 className="mt-3 flex items-center gap-1.5 text-xs hover:text-accent transition-colors"
                 style={{ color:'var(--text-3)' }}>
                 {isExp ? <ChevronUp size={12}/> : <ChevronDown size={12}/>}
-                {isExp ? 'Hide analysis' : 'View full analysis'}
+                {isExp ? 'Hide reasoning' : 'Why this call'}
               </button>
 
               <AnimatePresence>
                 {isExp && (
-                  <motion.div initial={{ height:0, opacity:0 }} animate={{ height:'auto', opacity:1 }} exit={{ height:0, opacity:0 }}>
-                    <div className="mt-4 pt-4 border-t space-y-3" style={{ borderColor:'var(--border)' }}>
-                      <div className="rounded-lg p-4 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
-                        <div className="mb-2">
-                          <span className="section-label">Rationale</span>
-                        </div>
-                        <p className="text-sm leading-relaxed" style={{ color:'var(--text-2)' }}>{alert.reasoning}</p>
+                  <motion.div initial={{ height:0, opacity:0 }} animate={{ height:'auto', opacity:1 }} exit={{ height:0, opacity:0 }}
+                    className="overflow-hidden">
+                    <div className="mt-3 pt-3 border-t grid sm:grid-cols-2 gap-4 text-sm" style={{ borderColor:'var(--border)' }}>
+                      <div>
+                        <div className="section-label mb-2">In its favour</div>
+                        <ul className="space-y-1.5" style={{ color:'var(--text-2)' }}>
+                          {sig.reasons.map(r => <li key={r}>{r}</li>)}
+                        </ul>
                       </div>
-                      <div className="grid grid-cols-3 gap-3">
-                        {[
-                          { label:'Entry', val:`$${alert.price.toFixed(2)}`,    color:'var(--accent)',  Icon:Target    },
-                          { label:'Target',val:`$${alert.target.toFixed(2)}`,   color:'rgb(var(--up))',          Icon:TrendingUp },
-                          { label:'Stop',  val:`$${alert.stopLoss.toFixed(2)}`, color:'rgb(var(--down))',        Icon:Shield    },
-                        ].map(l => (
-                          <div key={l.label} className="rounded-lg p-3 border text-center"
-                            style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
-                            <div className="flex items-center justify-center gap-1 mb-1">
-                              <l.Icon size={10} style={{ color:l.color }}/>
-                              <span className="text-xs" style={{ color:'var(--text-3)' }}>{l.label}</span>
-                            </div>
-                            <div className="font-black font-mono text-sm" style={{ color:l.color }}>{l.val}</div>
-                          </div>
-                        ))}
+                      <div>
+                        <div className="section-label mb-2">Risks</div>
+                        <ul className="space-y-1.5" style={{ color:'var(--text-2)' }}>
+                          {sig.risks.map(r => <li key={r}>{r}</li>)}
+                        </ul>
                       </div>
                     </div>
                   </motion.div>
@@ -666,29 +638,24 @@ function AISignalsTab() {
 /* ── Main page ─────────────────────────────────────────────── */
 export default function AIAlerts() {
   const [tab, setTab]           = useState('my-alerts')
-  const [alerts, setAlerts]     = useState(loadAlerts)
+  const { alerts, addAlert, togglePause, removeAlert, loading: alertsLoading, error: alertsError, signedIn } = useAlerts()
+  const { signals } = useSignals()
   const [creating, setCreating] = useState(false)
   const [selectedStock, setSelected] = useState(null)
   const [alertFilter, setAlertFilter] = useState('all')
 
-  useEffect(() => { saveAlerts(alerts) }, [alerts])
-
   const handleAddStock = (stock) => { setSelected(stock); setCreating(true) }
 
-  const handleSave = (newAlert) => {
-    setAlerts(prev => [newAlert, ...prev])
+  const handleSave = async (draft) => {
+    await addAlert(draft)        // throws with a readable message; the panel shows it
     setCreating(false)
     setSelected(null)
   }
 
-  const handlePause = (id) => {
-    setAlerts(prev => prev.map(a => a.id === id
-      ? { ...a, status: a.status === 'paused' ? 'active' : 'paused' }
-      : a
-    ))
-  }
-
-  const handleDelete = (id) => setAlerts(prev => prev.filter(a => a.id !== id))
+  const [actionError, setActionError] = useState('')
+  const guard = fn => async id => { setActionError(''); try { await fn(id) } catch (e) { setActionError(e.message) } }
+  const handlePause  = guard(togglePause)
+  const handleDelete = guard(removeAlert)
 
   const FILTERS = [
     { key:'all',       label:'All' },
@@ -718,7 +685,7 @@ export default function AIAlerts() {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6 page-enter">
 
       <PageHeader title="AI Alerts"
-        subtitle="Set price, move and sentiment alerts on any stock, and browse example buy, sell and hold signals.">
+        subtitle="Get told when a stock hits your price, moves sharply, changes outlook or makes news — and see today’s rule-based buy, sell and hold screen.">
         <StatusPill tone="muted">{activeCnt} active</StatusPill>
       </PageHeader>
 
@@ -727,7 +694,7 @@ export default function AIAlerts() {
         style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
         {[
           { key:'my-alerts', label:'My Alerts', badge: alerts.length },
-          { key:'ai-signals', label:'Signals', badge: mockSignals.length },
+          { key:'ai-signals', label:'Signals', badge: signals.length },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
             className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold border transition-all"
@@ -766,6 +733,15 @@ export default function AIAlerts() {
             )}
           </div>
 
+          <p className="text-xs leading-relaxed" style={{ color:'var(--text-3)' }}>
+            {signedIn
+              ? 'Your alerts are saved to your account and checked every minute by Foliyo’s server, even while this tab is closed.'
+              : 'Alerts are saved in this browser and checked every minute while Foliyo is open. Sign in to have them checked in the background and sent by email.'}
+          </p>
+          {(alertsError || actionError) && (
+            <p role="alert" className="text-xs text-red-400 font-medium">{actionError || alertsError}</p>
+          )}
+
           {/* Stats */}
           <div className="grid grid-cols-3 gap-3">
             {[
@@ -799,7 +775,10 @@ export default function AIAlerts() {
                 <AlertCard key={a.id} alert={a} onPause={handlePause} onDelete={handleDelete}/>
               ))}
             </AnimatePresence>
-            {visibleAlerts.length === 0 && (
+            {visibleAlerts.length === 0 && alertsLoading && (
+              <div className="h-28 rounded-xl shimmer"/>
+            )}
+            {visibleAlerts.length === 0 && !alertsLoading && (
               <div className="text-center py-16" style={{ color:'var(--text-3)' }}>
                 <Bell size={36} className="mx-auto mb-3 opacity-20"/>
                 <p className="text-sm font-medium" style={{ color:'var(--text-2)' }}>
@@ -821,7 +800,7 @@ export default function AIAlerts() {
       <div className="rounded-xl p-4 border text-xs" style={{ background:'var(--bg-2)', borderColor:'var(--border)', color:'var(--text-3)' }}>
         <AlertTriangle size={11} className="inline mr-1.5" style={{ color:'var(--text-3)' }}/>
         <span className="font-semibold" style={{ color:'var(--text-2)' }}>Not financial advice.</span>{' '}
-        Alerts are saved in this browser only and are not checked against live prices. Signals are examples, not recommendations.
+        Alerts and signals come from live prices and simple rules. They can be delayed or wrong; check before you act.
       </div>
     </div>
   )

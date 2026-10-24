@@ -12,6 +12,7 @@ import PageHeader from '../components/PageHeader'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts'
+import { persist } from '../utils/userStore'
 
 /* ── Persistence keys ────────────────────────────────────────── */
 const KEY_CASH     = 'foliyo_sim_cash'
@@ -23,7 +24,7 @@ const STARTING_CASH = 100_000
 function load(key, def) {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def } catch { return def }
 }
-function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)) } catch {} }
+function save(key, val) { try { persist(key, val) } catch {} }
 
 /* ── Deterministic portfolio chart ─────────────────────────── */
 function buildPortfolioChart(startVal, endVal, days) {

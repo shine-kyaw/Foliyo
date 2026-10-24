@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useParams, Link, Navigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, TrendingDown, Star, GitCompare,
@@ -14,10 +14,13 @@ import { useChart } from '../hooks/useChart'
 import { useFundamentals } from '../hooks/useFundamentals'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
 import { StatusPill } from '../components/PageHeader'
+import { api } from '../services/api'
+import { ysxStocks } from '../data/myanmarStocks'
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, BarChart, Bar,
 } from 'recharts'
+import { persist } from '../utils/userStore'
 
 const RANGES = ['1D','5D','1M','6M','1Y','5Y','All']
 const MONO_TICK = { fontSize:11, fill:'var(--text-3)', fontFamily:"'IBM Plex Mono', monospace" }
@@ -152,22 +155,52 @@ function wlSaveMeta(symbol, name) {
   try {
     const meta = JSON.parse(localStorage.getItem(WL_META) || '{}')
     meta[symbol] = { name }
-    localStorage.setItem(WL_META, JSON.stringify(meta))
+    persist(WL_META, meta)
   } catch {}
 }
 
+/* ── Symbols we don't carry: ask the search API what they are ── */
+function useSymbolLookup(symbol) {
+  const [state, setState] = useState({ status: symbol ? 'loading' : 'idle', results: [] })
+  useEffect(() => {
+    if (!symbol) { setState({ status: 'idle', results: [] }); return }
+    let cancelled = false
+    setState({ status: 'loading', results: [] })
+    api.search(symbol)
+      .then(r => { if (!cancelled) setState({ status: 'done', results: r.results || [] }) })
+      .catch(() => { if (!cancelled) setState({ status: 'error', results: [] }) })
+    return () => { cancelled = true }
+  }, [symbol])
+  const exact = state.results.find(r => r.symbol?.toUpperCase() === symbol)
+  return { ...state, exact }
+}
+
+const YSX_CODES = new Set(ysxStocks.map(s => s.code))
+
 export default function StockDetail() {
-  const { symbol } = useParams()
+  const { symbol: rawSymbol } = useParams()
+  const symbol = (rawSymbol || '').toUpperCase()
   const [range, setRange]           = useState('1M')
   const [logoError, setLogoError]   = useState(false)
   const [watchlisted, setWatchlist] = useState(() => wlLoad().has(symbol))
 
-  const stock = stocks.find(s => s.symbol === symbol) || stocks[0]
+  // Our own list first; anything else is described from live company data, never borrowed from another stock
+  const known = stocks.find(s => s.symbol === symbol)
 
   const { quote, status, lastUpdated, refetch } = useQuote(symbol)
   const { articles: liveNews } = useCompanyNews(symbol)
-  const { data: chartData, loading: chartLoading, isLive: chartLive, source: chartSource, refetch: refetchChart } = useChart(symbol, range, stock.price)
   const { data: fundamentals, loading: fundsLoading } = useFundamentals(symbol)
+  const lookup = useSymbolLookup(known ? null : symbol)
+  const stock = known || {
+    symbol,
+    name: fundamentals?.name || lookup.exact?.name || symbol,
+    sector: fundamentals?.industry || '',
+    exchange: fundamentals?.exchange || lookup.exact?.exchange || null,
+    pe: fundamentals?.pe ?? null,
+    mktCap: fundamentals?.mktCap ?? null,
+    price: null,
+  }
+  const { data: chartData, loading: chartLoading, isLive: chartLive, source: chartSource, refetch: refetchChart } = useChart(symbol, range, known?.price ?? null)
 
   /* Show "—" rather than mock prices until live data arrives. */
   const livePrice     = quote?.price     ?? null
@@ -198,7 +231,7 @@ export default function StockDetail() {
       wl.add(symbol)
       wlSaveMeta(symbol, stock.name)
     }
-    localStorage.setItem(WL_KEY, JSON.stringify([...wl]))
+    persist(WL_KEY, [...wl])
     setWatchlist(!watchlisted)
   }
 
@@ -236,6 +269,43 @@ export default function StockDetail() {
     ['ROE',        fmtPct(fundamentals?.roe)],
   ]
   const metrics = allMetrics.filter(([, v]) => v != null && v !== '—')
+
+  /* YSX codes have their own page */
+  if (YSX_CODES.has(symbol)) return <Navigate to={`/myanmar-stocks/${symbol}`} replace />
+
+  /* Nothing prices it, nothing describes it, and search has no exact match → it isn't a ticker we can show */
+  const stillChecking = status === 'loading' || fundsLoading || lookup.status === 'loading'
+  const unknown = !known && !hasPrice && !fundamentals?.name && !lookup.exact && !stillChecking
+  if (unknown) {
+    const suggestions = lookup.results.filter(r => r.symbol).slice(0, 5)
+    return (
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-16 page-enter">
+        <Link to="/markets" className="inline-flex items-center gap-1.5 text-sm mb-8 hover:text-accent transition-colors" style={{ color:'var(--text-3)' }}>
+          <ArrowLeft size={14}/> Markets
+        </Link>
+        <h1 className="text-3xl font-black mb-3" style={{ color:'var(--text-1)' }}>We can’t find “{symbol}”</h1>
+        <p className="text-sm leading-relaxed" style={{ color:'var(--text-2)' }}>
+          No exchange we cover lists this ticker, and there’s no live price for it. It may be misspelled, delisted, or traded somewhere Foliyo doesn’t reach.
+        </p>
+        {suggestions.length > 0 && (
+          <div className="mt-8">
+            <div className="section-label mb-3">Did you mean</div>
+            <div className="rounded-xl border divide-y" style={{ borderColor:'var(--border)' }}>
+              {suggestions.map(r => (
+                <Link key={r.symbol} to={r.type === 'YSX' ? `/myanmar-stocks/${r.symbol}` : `/stock/${encodeURIComponent(r.symbol)}`}
+                  className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-[var(--bg-2)] transition-colors"
+                  style={{ borderColor:'var(--border)' }}>
+                  <span className="font-bold text-sm" style={{ color:'var(--text-1)' }}>{r.symbol}</span>
+                  <span className="text-sm truncate" style={{ color:'var(--text-3)' }}>{r.name}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+        <Link to="/markets" className="btn-primary mt-8">Browse markets</Link>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6 page-enter">
@@ -488,7 +558,7 @@ export default function StockDetail() {
       </motion.div>
 
       {/* ── AI Analysis ─────────────────────────────────────── */}
-      <AIAnalysisCard stock={stock}/>
+      {hasPrice && <AIAnalysisCard stock={{ ...stock, price: livePrice, changePct: liveChangePct }}/>}
 
       {/* ── Latest News ─────────────────────────────────────── */}
       <motion.div
