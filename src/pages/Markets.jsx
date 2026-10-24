@@ -4,6 +4,7 @@ import { Search, ChevronRight } from 'lucide-react'
 import { stocks as baseStocks, sectorPerformance } from '../data/mockData'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
+import { useFundamentalsBatch, fmtVolume } from '../hooks/useFundamentalsBatch'
 import { useLiveIndices } from '../hooks/useLiveIndices'
 import { fmtPrice, fmtPct, fmtChange } from '../utils/formatLive'
 import { usSession } from '../utils/marketHours'
@@ -64,6 +65,7 @@ export default function Markets() {
   /* Live prices for every stock in our universe */
   const symbols = useMemo(() => baseStocks.map(s => s.symbol), [])
   const { quotes, lastUpdated } = useBatchQuotes(symbols, 60_000)
+  const fund = useFundamentalsBatch(symbols)   // market cap · P/E · 10-day average volume (Finnhub)
   const isLive = Object.keys(quotes).length > 0
   const session = usSession()
 
@@ -215,10 +217,10 @@ export default function Markets() {
         </div>
 
         <div className="overflow-auto max-h-[75vh] border-y" style={{ borderColor:'var(--border)' }}>
-          <table className="w-full min-w-[820px]">
+          <table className="w-full min-w-[1040px]">
             <thead>
               <tr>
-                {['Symbol','Name','Price','Change','Change %','Sector'].map((h, i) => (
+                {['Symbol','Name','Price','Change','Change %','Mkt cap','P/E','Avg vol (10d)','Sector'].map((h, i) => (
                   <th key={h} scope="col"
                     className={`th whitespace-nowrap sticky top-0 z-10 border-b ${i < 2 || h === 'Sector' ? 'text-left' : 'text-right'}`}
                     style={{ background:'var(--bg-0)', borderColor:'var(--border)', paddingLeft: i === 0 ? 0 : undefined }}>
@@ -242,6 +244,9 @@ export default function Markets() {
                   </td>
                   <td className="td text-right num text-[13px] font-semibold whitespace-nowrap" style={{ color: tone(s.change) }}>{fmtChange(s.change)}</td>
                   <td className="td text-right num text-[13px] font-semibold whitespace-nowrap" style={{ color: tone(s.changePct) }}>{fmtPct(s.changePct)}</td>
+                  <td className="td text-right num text-[13px] whitespace-nowrap" style={{ color:'var(--text-1)' }}>{fund[s.symbol]?.mktCap || '—'}</td>
+                  <td className="td text-right num text-[13px] whitespace-nowrap" style={{ color:'var(--text-2)' }}>{fund[s.symbol]?.pe != null ? `${fund[s.symbol].pe.toFixed(1)}x` : '—'}</td>
+                  <td className="td text-right num text-[13px] whitespace-nowrap" style={{ color:'var(--text-2)' }}>{fmtVolume(fund[s.symbol]?.avgVolume10d)}</td>
                   <td className="td text-[13px] whitespace-nowrap" style={{ color:'var(--text-3)' }}>{s.sector}</td>
                 </tr>
               ))}

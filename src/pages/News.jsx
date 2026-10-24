@@ -1,5 +1,8 @@
 import { useState, useMemo } from 'react'
-import { Search, Loader2 } from 'lucide-react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { Search, Loader2, ChevronRight } from 'lucide-react'
+import { foliyoPosts, FACEBOOK_PAGE } from '../data/foliyoPosts'
+import { excerpt, LangToggle } from './FoliyoPost'
 import { useMarketNews } from '../hooks/useMarketNews'
 import PageHeader, { StatusPill } from '../components/PageHeader'
 
@@ -75,8 +78,51 @@ function StoryRow({ a }) {
   )
 }
 
+/* ── Foliyo's own articles (from the Facebook page) ─────────── */
+function FoliyoCard({ p, lang, big }) {
+  const v = p[lang]
+  return (
+    <Link to={`/news/foliyo/${p.slug}`} className="group block rounded-xl border p-5 h-full transition-colors hover:border-[var(--border-light)]"
+      style={{ borderColor:'var(--border)', background:'var(--bg-2)' }}>
+      <div className="eyebrow mb-3">Foliyo</div>
+      <h3 className={`${big ? 'text-[1.6rem]' : 'text-[1.15rem]'} font-bold leading-snug group-hover:underline ${lang === 'my' ? 'lang-my' : 'headline'}`}
+        style={{ color:'var(--text-1)' }} lang={lang === 'my' ? 'my' : 'en'}>
+        {v.title}
+      </h3>
+      <p className={`mt-2 text-sm leading-relaxed line-clamp-3 ${lang === 'my' ? 'lang-my' : ''}`} style={{ color:'var(--text-2)' }}>
+        {excerpt(v.body, big ? 260 : 150)}
+      </p>
+      <span className="inline-flex items-center gap-1 mt-3 text-[13px] font-semibold link">Read article <ChevronRight size={14}/></span>
+    </Link>
+  )
+}
+
+function FoliyoSection({ all, lang, setLang }) {
+  const list = all ? foliyoPosts : foliyoPosts.slice(0, 3)
+  return (
+    <section aria-label="From Foliyo" className="mb-10">
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
+        <div>
+          <h2 className="section-title text-[1.35rem]">From Foliyo</h2>
+          <p className="text-sm mt-0.5" style={{ color:'var(--text-2)' }}>
+            Plain-language explainers from our <a href={FACEBOOK_PAGE} target="_blank" rel="noopener noreferrer" className="link">Facebook page</a>, in English and Burmese.
+          </p>
+        </div>
+        <LangToggle lang={lang} setLang={setLang} />
+      </div>
+      <div className={`grid gap-4 ${all ? 'sm:grid-cols-2' : 'md:grid-cols-3'}`}>
+        {list.map((p, i) => <FoliyoCard key={p.slug} p={p} lang={lang} big={all && i === 0} />)}
+      </div>
+    </section>
+  )
+}
+
 export default function News() {
-  const [category, setCategory] = useState('All')
+  const [params, setParams] = useSearchParams()
+  const [category, setCategoryState] = useState(() => params.get('tab') === 'foliyo' ? 'Foliyo' : 'All')
+  const setCategory = c => { setCategoryState(c); setParams(c === 'Foliyo' ? { tab:'foliyo' } : {}, { replace:true }) }
+  const [lang, setLangState] = useState(() => { try { return localStorage.getItem('foliyo_read_lang') || 'en' } catch { return 'en' } })
+  const setLang = l => { setLangState(l); try { localStorage.setItem('foliyo_read_lang', l) } catch {} }
   const [search, setSearch] = useState('')
 
   const { articles: newsArticles, isLive, loading } = useMarketNews()
@@ -84,7 +130,7 @@ export default function News() {
   const q = search.toLowerCase()
   const filtered = useMemo(() => {
     const list = newsArticles.filter(n =>
-      (category === 'All' || n.category === category) &&
+      (category === 'All' || category === 'Foliyo' || n.category === category) &&
       (n.title.toLowerCase().includes(q) || n.source.toLowerCase().includes(q))
     )
     // stories with a picture lead, as on the home page
@@ -92,7 +138,7 @@ export default function News() {
   }, [newsArticles, category, q])
 
   // Only offer categories that actually have stories right now
-  const tabs = CATEGORIES.filter(c => c === 'All' || c === category || newsArticles.some(n => n.category === c))
+  const tabs = ['All', 'Foliyo', ...CATEGORIES.filter(c => c !== 'All' && (c === category || newsArticles.some(n => n.category === c)))]
 
   const [lead, ...more] = filtered
 
@@ -121,6 +167,13 @@ export default function News() {
           </button>
         ))}
       </div>
+
+      {/* ── Foliyo articles: a row on All, the full set on their own tab ── */}
+      {category === 'All' && !search && <FoliyoSection lang={lang} setLang={setLang} />}
+      {category === 'Foliyo' && <FoliyoSection all lang={lang} setLang={setLang} />}
+
+      {category !== 'Foliyo' && <>
+      {category === 'All' && !search && <h2 className="section-title text-[1.35rem] mb-4">Market headlines</h2>}
 
       {/* ── Stories ── */}
       {loading && (
@@ -156,6 +209,7 @@ export default function News() {
             : 'Headlines aren’t loading right now. Try refreshing in a minute.'}
         </p>
       )}
+      </>}
     </div>
   )
 }

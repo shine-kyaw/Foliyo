@@ -10,6 +10,8 @@ import { useBatchQuotes } from '../hooks/useBatchQuotes'
 import { useAssetQuotes } from '../hooks/useAssetQuotes'
 import PageHeader from '../components/PageHeader'
 import { persist } from '../utils/userStore'
+import Sparkline from '../components/Sparkline'
+import { useChart } from '../hooks/useChart'
 
 const ALL_ASSETS = [...usStocks, ...euStocks, ...asiaStocks, ...cryptos, ...commodities, ...currencies]
 
@@ -247,8 +249,14 @@ function AddStockSearch({ pinned, onAdd }) {
 }
 
 /* ── Shared table head ─────────────────────────────────────── */
-function TableHead({ last }) {
-  const cols = ['Symbol', 'Name', 'Last price', 'Change', 'Change %']
+/* Real intraday line for a pinned row (same chart feed as the stock page) */
+function RowSpark({ symbol, up }) {
+  const { data } = useChart(symbol, '1D', null)
+  return <Sparkline data={data} up={up} width={88} height={28} />
+}
+
+function TableHead({ last, spark }) {
+  const cols = ['Symbol', 'Name', 'Last price', 'Change', 'Change %', ...(spark ? ['Today'] : [])]
   return (
     <thead>
       <tr className="border-b" style={{ borderColor:'var(--border)' }}>
@@ -262,7 +270,7 @@ function TableHead({ last }) {
 }
 
 /* ── Pinned watchlist row ──────────────────────────────────── */
-function WatchRow({ stock, type = 'stock', noLive, onRemove }) {
+function WatchRow({ stock, type = 'stock', noLive, onRemove, sparkSymbol }) {
   const hasPrice = stock.price != null
   const color = hasPrice ? tone(stock.changePct) : 'var(--text-3)'
   const ai = stock.sector && hasPrice ? generateAIAnalysis(stock) : null
@@ -290,6 +298,11 @@ function WatchRow({ stock, type = 'stock', noLive, onRemove }) {
         )}
         {ai && <VerdictTag verdict={ai.verdict}/>}
       </td>
+      {sparkSymbol !== undefined && (
+        <td className="td text-right">
+          {sparkSymbol ? <RowSpark symbol={sparkSymbol} up={(stock.changePct ?? 0) >= 0}/> : <span style={{ color:'var(--text-3)' }}>—</span>}
+        </td>
+      )}
       <td className="td text-right">
         <button onClick={() => onRemove(stock.symbol)} aria-label={`Remove ${stock.symbol} from watchlist`}
           className="w-7 h-7 rounded-full inline-flex items-center justify-center transition-colors hover:bg-[var(--bg-3)]"
@@ -317,7 +330,7 @@ function StockWatchTile({ symbol, onRemove }) {
     changePct: quote?.changePct ?? null,
     change:    quote?.change    ?? null,
   }
-  return <WatchRow stock={stock} onRemove={onRemove}/>
+  return <WatchRow stock={stock} onRemove={onRemove} sparkSymbol={symbol}/>
 }
 
 function AssetWatchTile({ symbol, type, onRemove }) {
@@ -329,7 +342,7 @@ function AssetWatchTile({ symbol, type, onRemove }) {
     changePct: q?.changePct ?? null,
     change:    q?.change    ?? null,
   }
-  return <WatchRow stock={stock} type={type} noLive={!q && (ready || !ASSET_FEED[symbol])} onRemove={onRemove}/>
+  return <WatchRow stock={stock} type={type} noLive={!q && (ready || !ASSET_FEED[symbol])} onRemove={onRemove} sparkSymbol={ASSET_FEED[symbol] || null}/>
 }
 
 function LiveWatchTile({ symbol, onRemove }) {
@@ -517,7 +530,7 @@ export default function Watchlist() {
           </div>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[560px]">
-              <TableHead last="Remove"/>
+              <TableHead last="Remove" spark/>
               <tbody>
                 {pinnedItems.map(s => (
                   <LiveWatchTile key={s.symbol} symbol={s.symbol} onRemove={removePin}/>

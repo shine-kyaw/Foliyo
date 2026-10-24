@@ -108,6 +108,9 @@ h1, h2, .font-display, .headline {
 }
 .lean { font-style: normal; color: inherit; }   /* retired motif — kept so old markup stays neutral */
 
+/* Burmese text — Archivo has no Myanmar glyphs, and the script needs more line height */
+.lang-my { font-family: 'Noto Sans Myanmar', 'Archivo', system-ui, sans-serif; font-stretch: 100%; letter-spacing: 0; line-height: 1.9; }
+
 /* Numbers sit in the text face with tabular figures, as on a quote board */
 .font-mono, .num { font-family: 'Archivo', system-ui, sans-serif; font-feature-settings: 'tnum' 1, 'lnum' 1; letter-spacing: 0; }
 

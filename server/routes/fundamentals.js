@@ -6,6 +6,14 @@ const FINNHUB = 'https://finnhub.io/api/v1'
 const AV = 'https://www.alphavantage.co/query'
 const TTL = 24 * 60 * 60_000  // 24 h
 
+/* Market cap in USD, from millions → "$5.12T" / "$842.3B" / "$410.0M" */
+export function fmtCap(millions) {
+  if (!Number.isFinite(millions) || millions <= 0) return null
+  if (millions >= 1e6) return `$${(millions / 1e6).toFixed(2)}T`
+  if (millions >= 1e3) return `$${(millions / 1e3).toFixed(1)}B`
+  return `$${millions.toFixed(1)}M`
+}
+
 async function fetchFinnhub(symbol, apiKey) {
   const [metricRes, profileRes] = await Promise.allSettled([
     fetch(`${FINNHUB}/stock/metric?symbol=${symbol}&metric=all&token=${apiKey}`, { signal: AbortSignal.timeout(8000) }),
@@ -27,7 +35,9 @@ async function fetchFinnhub(symbol, apiKey) {
     dividendYield: m.dividendYieldIndicatedAnnual ?? null,
     week52High: m['52WeekHigh'] ?? null,
     week52Low: m['52WeekLow'] ?? null,
-    mktCap: profile.marketCapitalization ? `$${(profile.marketCapitalization / 1000).toFixed(1)}B` : null,
+    mktCap: fmtCap(profile.marketCapitalization),
+    mktCapUsdM: profile.marketCapitalization ?? null,
+    avgVolume10d: m['10DayAverageTradingVolume'] != null ? m['10DayAverageTradingVolume'] * 1e6 : null,
     sharesOutstanding: profile.shareOutstanding ?? null,
     name: profile.name ?? null,
     exchange: profile.exchange ?? null,
@@ -59,7 +69,7 @@ async function fetchAlphaVantage(symbol, apiKey) {
     dividendYield: parseFloat(d.DividendYield) ? parseFloat(d.DividendYield) * 100 : null,
     week52High: parseFloat(d['52WeekHigh']) || null,
     week52Low: parseFloat(d['52WeekLow']) || null,
-    mktCap: d.MarketCapitalization ? `$${(parseInt(d.MarketCapitalization) / 1e9).toFixed(1)}B` : null,
+    mktCap: fmtCap(parseInt(d.MarketCapitalization) / 1e6),
     sharesOutstanding: parseInt(d.SharesOutstanding) || null,
     name: d.Name ?? null,
     exchange: d.Exchange ?? null,
@@ -121,6 +131,43 @@ router.get('/', async (req, res) => {
   const result = { ...data, symbol, isLive: true, lastUpdated: new Date().toISOString() }
   set(cacheKey, result, TTL)
   res.json(result)
+})
+
+/* ── Batch: /api/fundamentals/batch?symbols=AAPL,MSFT,… ──────────
+   Answers at once with what's cached and fills the rest in the
+   background, one symbol every ~2.5 s, so tables can ask again.   */
+const queue = new Set()
+let draining = false
+async function drain() {
+  if (draining) return
+  draining = true
+  const apiKey = process.env.FINNHUB_API_KEY
+  try {
+    while (queue.size && apiKey) {
+      const symbol = queue.values().next().value
+      queue.delete(symbol)
+      if (get(`fundamentals:${symbol}`)) continue
+      try {
+        const data = await fetchFinnhub(symbol, apiKey)
+        if (data.name || data.pe != null || data.mktCap) {
+          set(`fundamentals:${symbol}`, { ...data, symbol, isLive: true, lastUpdated: new Date().toISOString() }, TTL)
+        }
+      } catch { /* try again on a later request */ }
+      await new Promise(r => setTimeout(r, 2500))
+    }
+  } finally { draining = false }
+}
+
+router.get('/batch', (req, res) => {
+  const symbols = String(req.query.symbols || '').split(',').map(s => s.trim().toUpperCase()).filter(Boolean).slice(0, 80)
+  const data = {}, pending = []
+  for (const s of symbols) {
+    const c = get(`fundamentals:${s}`)
+    if (c) data[s] = { mktCap: c.mktCap, mktCapUsdM: c.mktCapUsdM ?? null, pe: c.pe, avgVolume10d: c.avgVolume10d ?? null, week52High: c.week52High, week52Low: c.week52Low, dividendYield: c.dividendYield }
+    else { pending.push(s); queue.add(s) }
+  }
+  drain()
+  res.json({ data, pending, source: 'Finnhub', lastUpdated: new Date().toISOString() })
 })
 
 export default router

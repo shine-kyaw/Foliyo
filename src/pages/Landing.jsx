@@ -8,6 +8,7 @@ import { useSignals } from '../hooks/useSignals'
 import { useMarketNews } from '../hooks/useMarketNews'
 import { EXCHANGES, sessionState, hoursLabel } from '../utils/exchanges'
 import { fmtPrice, fmtPct } from '../utils/formatLive'
+import { foliyoPosts } from '../data/foliyoPosts'
 
 /* ── Helpers ────────────────────────────────────────────────── */
 const ago = ms => {
@@ -199,6 +200,20 @@ function RightRail() {
     <aside className="space-y-5">
       <div className={box} style={boxStyle}>
         <SearchBox placeholder="Quote lookup" />
+      </div>
+
+      <div className={box} style={boxStyle}>
+        <SectionHead to="/news?tab=foliyo">From Foliyo</SectionHead>
+        <ul>
+          {foliyoPosts.slice(0, 4).map(p => (
+            <li key={p.slug} className="border-t first:border-t-0" style={{ borderColor:'var(--border)' }}>
+              <Link to={`/news/foliyo/${p.slug}`} className="block py-2.5 text-[14px] font-semibold leading-snug hover:underline" style={{ color:'var(--text-1)' }}>
+                {p.en.title}
+              </Link>
+            </li>
+          ))}
+        </ul>
+        <p className="text-[11px] mt-1" style={{ color:'var(--text-3)' }}>Explainers in English and Burmese.</p>
       </div>
 
       <div className={box} style={boxStyle}>

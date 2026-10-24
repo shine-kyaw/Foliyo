@@ -7,6 +7,7 @@ import { ysxStocks, ysxMarketStats, fmtMktCap, YSX_URL } from '../data/myanmarSt
 import { useYsxQuotes, withQuote } from '../hooks/useYsx'
 import { api } from '../services/api'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
+import { useFundamentalsBatch, fmtVolume } from '../hooks/useFundamentalsBatch'
 import { fmtPrice as fmtPriceLive, fmtPct, fmtChange } from '../utils/formatLive'
 import PageHeader, { StatusPill } from '../components/PageHeader'
 
@@ -97,9 +98,9 @@ function AssetRow({ asset, priceDecimals = 2 }) {
 }
 
 /* ── Stock row (for US / EU / Asia) ──────────────────────────── */
-const STOCK_COLS = [['Symbol','l'],['Name','l'],['Price','r'],['Change','r'],['Change %','r'],['Sector','l'],['Data','r']]
+const STOCK_COLS = [['Symbol','l'],['Name','l'],['Price','r'],['Change','r'],['Change %','r'],['Mkt cap','r'],['P/E','r'],['Avg vol (10d)','r'],['Sector','l'],['Data','r']]
 
-function StockRow({ stock }) {
+function StockRow({ stock, f }) {
   return (
     <tr className={rowCls} style={rowStyle}>
       <td className="td whitespace-nowrap" style={{ paddingLeft:0 }}>
@@ -111,6 +112,9 @@ function StockRow({ stock }) {
       </td>
       <td className={`${numCell} font-semibold`} style={{ color: tone(stock.change) }}>{fmtChange(stock.change)}</td>
       <td className={`${numCell} font-semibold`} style={{ color: tone(stock.changePct) }}>{fmtPct(stock.changePct)}</td>
+      <td className={numCell} style={{ color:'var(--text-1)' }}>{f?.mktCap || '—'}</td>
+      <td className={numCell} style={{ color:'var(--text-2)' }}>{f?.pe != null ? `${f.pe.toFixed(1)}x` : '—'}</td>
+      <td className={numCell} style={{ color:'var(--text-2)' }}>{fmtVolume(f?.avgVolume10d)}</td>
       <td className="td text-[13px] whitespace-nowrap" style={{ color:'var(--text-3)' }}>{stock.sector}</td>
       <td className="td text-right"><StatusBadge status={stock._live ? 'live' : 'mock'} /></td>
     </tr>
@@ -125,6 +129,7 @@ function StockTab({ stocks: data, region }) {
    * Null out mock prices while waiting so we never briefly flash wrong data. */
   const symbols = data.map(s => s.symbol)
   const { quotes } = useBatchQuotes(symbols, 60_000)
+  const fund = useFundamentalsBatch(symbols)
   const live = data.map(s => {
     const q = quotes[s.symbol]
     return q
@@ -141,8 +146,8 @@ function StockTab({ stocks: data, region }) {
           ? <StatusPill tone="live" pulse>Live · Finnhub</StatusPill>
           : <StatusPill tone="muted">Reference data</StatusPill>}
       </BoardHead>
-      <Screener cols={STOCK_COLS} minWidth={860}>
-        {live.map(s => <StockRow key={s.symbol} stock={s} />)}
+      <Screener cols={STOCK_COLS} minWidth={1080}>
+        {live.map(s => <StockRow key={s.symbol} stock={s} f={fund[s.symbol]} />)}
       </Screener>
     </div>
   )

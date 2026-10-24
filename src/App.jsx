@@ -17,6 +17,7 @@ import Simulator from './pages/Simulator'
 import MyanmarStocks from './pages/MyanmarStocks'
 import MyanmarStockDetail from './pages/MyanmarStockDetail'
 import GlobalMarkets from './pages/GlobalMarkets'
+import FoliyoPost from './pages/FoliyoPost'
 
 const pageVariants = {
   initial: { opacity: 0, y: 16 },
@@ -34,6 +35,7 @@ function AnimatedRoutes() {
           <Route path="/markets"    element={<Markets />} />
           <Route path="/stock/:symbol" element={<StockDetail />} />
           <Route path="/news"       element={<News />} />
+          <Route path="/news/foliyo/:slug" element={<FoliyoPost />} />
           <Route path="/portfolio"  element={<Portfolio />} />
           <Route path="/ai-alerts"  element={<AIAlerts />} />
           <Route path="/watchlist"  element={<Watchlist />} />

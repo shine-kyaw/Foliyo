@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Search, X } from 'lucide-react'
 import { stocks } from '../data/mockData'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
+import { useHoldingsHistory } from '../hooks/useHoldingsHistory'
 import PageHeader from '../components/PageHeader'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart as RPie, Pie, Cell } from 'recharts'
 import { persist } from '../utils/userStore'
@@ -225,6 +226,10 @@ export default function Portfolio() {
     { label:'Positions',       value: String(holdings.length), sub: `${winning} in profit` },
   ]
 
+  const [histRange, setHistRange] = useState('6M')
+  const { data: history, loading: historyLoading, missing: historyMissing } = useHoldingsHistory(saved, histRange)
+  const histUp = history.length > 1 && history.at(-1).value >= history[0].value
+
   return (
     <div className="max-w-[1320px] mx-auto px-4 sm:px-6 py-6 page-enter">
 
@@ -345,6 +350,45 @@ export default function Portfolio() {
 
           {/* ── Performance + allocation ── */}
           <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-x-10 gap-y-10">
+            <section aria-label="Holdings value history">
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                <h2 className="section-title">Value of these holdings</h2>
+                <div className="flex gap-1" role="group" aria-label="History range">
+                  {['1M','6M','1Y'].map(r => (
+                    <button key={r} onClick={() => setHistRange(r)} aria-pressed={histRange === r}
+                      className="text-xs px-3 py-1.5 rounded-full font-semibold transition-colors"
+                      style={histRange === r ? { background:'var(--btn-bg)', color:'var(--btn-fg)' } : { color:'var(--text-2)' }}>{r}</button>
+                  ))}
+                </div>
+              </div>
+              {historyLoading && !history.length ? (
+                <div className="h-[220px] rounded-lg shimmer" />
+              ) : history.length > 1 ? (
+                <ResponsiveContainer width="100%" height={220}>
+                  <AreaChart data={history} margin={{ top:5, right:5, bottom:0, left:5 }}>
+                    <defs>
+                      <linearGradient id="holdGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%"  stopColor={histUp ? 'rgb(var(--up))' : 'rgb(var(--down))'} stopOpacity={0.14}/>
+                        <stop offset="95%" stopColor={histUp ? 'rgb(var(--up))' : 'rgb(var(--down))'} stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke="var(--border)" vertical={false}/>
+                    <XAxis dataKey="date" tick={{ fontSize:11, fill:'var(--text-3)' }} interval={Math.max(0, Math.floor(history.length / 5))} axisLine={false} tickLine={false}/>
+                    <YAxis tick={{ fontSize:11, fill:'var(--text-3)' }} domain={['auto','auto']} axisLine={false} tickLine={false}
+                      tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(1)}k` : `$${v.toFixed(0)}`} width={52}/>
+                    <Tooltip content={<ChartTip/>}/>
+                    <Area type="monotone" dataKey="value" stroke={histUp ? 'rgb(var(--up))' : 'rgb(var(--down))'} strokeWidth={1.75} fill="url(#holdGrad)"/>
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="h-[120px] flex items-center text-sm" style={{ color:'var(--text-3)' }}>Price history isn’t available right now. Try again in a minute.</p>
+              )}
+              <p className="text-xs mt-2" style={{ color:'var(--text-3)' }}>
+                Each day’s real closing prices × the shares you hold today — how this mix has moved, not a record of when you bought.
+                {historyMissing.length > 0 && ` Not included (no price history): ${historyMissing.join(', ')}.`}
+              </p>
+            </section>
+
             <section aria-label="Sector allocation">
               <h2 className="section-title mb-3">Allocation</h2>
               <ResponsiveContainer width="100%" height={140}>

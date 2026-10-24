@@ -60,6 +60,9 @@ export const api = {
   /** Stock fundamentals: PE, PB, beta, description, etc. */
   fundamentals: (symbol) => apiFetch('/fundamentals', { symbol }),
 
+  /** Market cap / P/E / avg volume for many symbols — cached part now, rest filled in the background */
+  fundamentalsBatch: (symbols) => apiFetch('/fundamentals/batch', { symbols }),
+
   /** Symbol + company name search */
   search: (q) => apiFetch('/search', { q }),
 
