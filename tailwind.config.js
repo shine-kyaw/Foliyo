@@ -24,14 +24,15 @@ export default {
         red:     { 300: v('--down-soft'), 400: v('--down'), 500: v('--down') },
         yellow:  { 400: v('--caution') },
 
-        // Neutrals warmed to match cream text on charcoal
-        slate: { 400: '#a49d90', 500: '#7f796e', 700: '#3a3833', 800: '#26252a' },
-        gray:  { 300: '#cfc8ba', 400: '#a49d90' },
+        // Neutrals — cool slate, matching the light theme
+        slate: { 400: '#8a939c', 500: '#6b747d', 700: '#3a4148', 800: '#262b31' },
+        gray:  { 300: '#c4cad0', 400: '#8a939c' },
       },
       fontFamily: {
         sans:    ['Archivo', 'system-ui', 'sans-serif'],
         display: ['Archivo', 'system-ui', 'sans-serif'],
-        mono:    ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
+        // Figures use the text face with tabular numerals (see .font-mono in index.css)
+        mono:    ['Archivo', 'system-ui', 'sans-serif'],
       },
       animation: {
         'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',

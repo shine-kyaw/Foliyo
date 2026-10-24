@@ -7,9 +7,9 @@ import { useQuote } from '../hooks/useQuote'
 import { BrandLockup } from './Navbar'
 
 /* Segmented-control states, shared by every picker in the panel */
-const SEG_ON  = { background:'rgba(var(--accent-rgb),.12)', color:'var(--text-1)', borderColor:'rgba(var(--accent-rgb),.25)' }
+const SEG_ON  = { background:'var(--btn-bg)', color:'var(--btn-fg)', borderColor:'var(--btn-bg)' }
 const SEG_OFF = { background:'transparent', color:'var(--text-2)', borderColor:'transparent' }
-const SEG_WRAP = { background:'var(--bg-2)', borderColor:'var(--border)' }
+const SEG_WRAP = { background:'var(--bg-3)', borderColor:'var(--bg-3)' }
 
 const overlay = { hidden:{ opacity:0 }, visible:{ opacity:1 }, exit:{ opacity:0 } }
 const panel = {
@@ -49,9 +49,9 @@ function AlertsPreview() {
   const chg   = quote?.changePct
   const hasPrice = price != null
   return (
-    <div className="rounded-lg p-4 border mt-3" style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
+    <div className="rounded-[10px] p-4 border mt-3" style={{ background:'var(--bg-0)', borderColor:'var(--border)' }}>
       <div className="flex items-center gap-3 mb-3">
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center font-black text-sm"
+        <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm"
           style={{ background:`rgba(var(--accent-rgb),.12)`, color:'var(--accent)' }}>A</div>
         <div>
           <div className="font-bold text-sm" style={{ color:'var(--text-1)' }}>AAPL · Apple Inc.</div>
@@ -59,11 +59,11 @@ function AlertsPreview() {
         </div>
       </div>
       <div className="flex items-center justify-between">
-        <span className="font-black font-mono" style={{ color: hasPrice ? 'var(--text-1)' : 'var(--text-3)' }}>
+        <span className="font-bold num" style={{ color: hasPrice ? 'var(--text-1)' : 'var(--text-3)' }}>
           {hasPrice ? `$${price.toFixed(2)}` : '—'}
         </span>
-        <span className={`text-sm font-bold font-mono ${chg == null ? '' : chg >= 0 ? 'text-emerald-400' : 'text-red-400'}`}
-          style={chg == null ? { color:'var(--text-3)' } : undefined}>
+        <span className="text-sm font-semibold num"
+          style={{ color: chg == null ? 'var(--text-3)' : chg >= 0 ? 'rgb(var(--up))' : 'rgb(var(--down))' }}>
           {chg != null ? `${chg >= 0 ? '+' : ''}${chg.toFixed(2)}%` : '—'}
         </span>
       </div>
@@ -131,7 +131,7 @@ export default function Sidebar() {
             className="sidebar-overlay" onClick={() => setSidebar(false)} />
 
           <motion.div key="panel" variants={panel} initial="hidden" animate="visible" exit="exit"
-            className="sidebar-panel" style={{ background:'var(--bg-1)' }}>
+            className="sidebar-panel" style={{ background:'var(--bg-0)' }}>
 
             {/* Brand + tab header */}
             <div className="px-5 pt-4 pb-4 border-b shrink-0 space-y-4"
@@ -139,15 +139,15 @@ export default function Sidebar() {
               <div className="flex items-center justify-between">
                 <BrandLockup size={24} />
                 <button onClick={() => setSidebar(false)} aria-label="Close panel"
-                  className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors hover:bg-white/5"
+                  className="w-8 h-8 rounded-full flex items-center justify-center transition-colors hover:bg-[var(--bg-3)]"
                   style={{ color:'var(--text-2)' }}>
                   <X size={16} />
                 </button>
               </div>
-              <div className="flex gap-1 p-1 rounded-lg border" style={SEG_WRAP}>
+              <div className="flex gap-1 p-1 rounded-full border" style={SEG_WRAP}>
                 {['account','preferences'].map(tab => (
                   <button key={tab} onClick={() => setSidebarTab(tab)}
-                    className="flex-1 px-4 py-1.5 rounded-md text-sm font-semibold capitalize border transition-all"
+                    className="flex-1 px-4 py-1.5 rounded-full text-sm font-semibold capitalize border transition-all"
                     style={sidebarTab === tab ? SEG_ON : SEG_OFF}>{tab}</button>
                 ))}
               </div>
@@ -163,12 +163,12 @@ export default function Sidebar() {
                     {user ? (
                       <div>
                         <div className="text-center py-4">
-                          <div className="w-16 h-16 rounded-xl flex items-center justify-center text-2xl font-black mx-auto mb-3 relative"
+                          <div className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold mx-auto mb-3 relative"
                             style={{ background:`rgba(var(--accent-rgb),.12)`, color:'var(--accent)', border:`1px solid rgba(var(--accent-rgb),.25)` }}>
                             {user.name.charAt(0).toUpperCase()}
                             {user.provider === 'google' && (
                               <span className="absolute -bottom-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center"
-                                style={{ background:'var(--bg-1)', border:'1px solid var(--border)' }}>
+                                style={{ background:'var(--bg-0)', border:'1px solid var(--border)' }}>
                                 <GoogleIcon />
                               </span>
                             )}
@@ -176,19 +176,19 @@ export default function Sidebar() {
                           <div className="font-bold text-base" style={{ color:'var(--text-1)' }}>{user.name}</div>
                           <div className="text-sm mt-0.5" style={{ color:'var(--text-3)' }}>{user.email}</div>
                           {user.provider === 'google' && (
-                            <span className="inline-flex items-center gap-1.5 text-xs mt-2 px-2 py-0.5 rounded-md"
-                              style={{ background:'var(--bg-2)', color:'var(--text-2)', border:'1px solid var(--border)' }}>
+                            <span className="inline-flex items-center gap-1.5 text-xs mt-2 px-2.5 py-1 rounded-full"
+                              style={{ background:'var(--bg-1)', color:'var(--text-2)', border:'1px solid var(--border)' }}>
                               <GoogleIcon /> Signed in with Google
                             </span>
                           )}
                         </div>
 
-                        <div className="space-y-2 mt-4">
+                        <div className="mt-4 border-t" style={{ borderColor:'var(--border)' }}>
                           {[['My portfolio','/portfolio'],['Watchlist','/watchlist'],['AI alerts','/ai-alerts'],['Preferences',null]].map(([item, to]) => (
                             <button key={item}
                               onClick={() => to ? (navigate(to), setSidebar(false)) : setSidebarTab('preferences')}
-                              className="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium transition-colors border"
-                              style={{ background:'var(--bg-2)', color:'var(--text-2)', borderColor:'var(--border)' }}>
+                              className="w-full flex items-center justify-between px-1 py-3 text-sm font-semibold transition-colors border-b hover:bg-[var(--bg-1)]"
+                              style={{ background:'transparent', color:'var(--text-1)', borderColor:'var(--border)' }}>
                               {item}
                               <ChevronRight size={14} style={{ color:'var(--text-3)' }} />
                             </button>
@@ -200,8 +200,7 @@ export default function Sidebar() {
                         </p>
 
                         <button onClick={handleSignOut}
-                          className="w-full mt-6 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-bold transition-colors"
-                          style={{ background:'var(--bg-2)', color:'var(--text-1)', border:'1px solid var(--border-light)' }}>
+                          className="btn-ghost w-full mt-6 justify-center !py-2.5">
                           <LogOut size={15} /> Sign out
                         </button>
 
@@ -218,13 +217,13 @@ export default function Sidebar() {
                               </p>
                               <div className="flex gap-2">
                                 <button onClick={handleDeleteAccount} disabled={authLoading}
-                                  className="flex-1 py-2 rounded-md text-xs font-bold disabled:opacity-60"
+                                  className="flex-1 py-2 rounded-full text-xs font-semibold disabled:opacity-60"
                                   style={{ background:'rgb(var(--down) / .12)', color:'rgb(var(--down))', border:'1px solid rgb(var(--down) / .3)' }}>
                                   Delete permanently
                                 </button>
-                                <button onClick={() => setConfirmDelete(false)} className="btn-ghost flex-1 justify-center !py-2 text-xs">Keep account</button>
+                                <button onClick={() => setConfirmDelete(false)} className="btn-ghost flex-1 justify-center !py-2 !px-3 text-xs">Keep account</button>
                               </div>
-                              {authError && <p role="alert" className="text-xs text-red-400 font-medium">{authError}</p>}
+                              {authError && <p role="alert" className="text-xs font-medium" style={{ color:'rgb(var(--down))' }}>{authError}</p>}
                             </div>
                           )}
                         </div>
@@ -235,7 +234,7 @@ export default function Sidebar() {
                         <Loader2 size={15} className="animate-spin" /> Checking your account…
                       </div>
                     ) : !accountConfig.enabled ? (
-                      <div className="rounded-lg border p-4 text-sm leading-relaxed" style={{ background:'var(--bg-2)', borderColor:'var(--border)', color:'var(--text-2)' }}>
+                      <div className="rounded-[10px] border p-4 text-sm leading-relaxed" style={{ background:'var(--bg-1)', borderColor:'var(--border)', color:'var(--text-2)' }}>
                         <div className="font-bold mb-1.5" style={{ color:'var(--text-1)' }}>
                           {accountConfig.unreachable ? 'Can’t reach the account server' : 'Accounts aren’t switched on yet'}
                         </div>
@@ -246,13 +245,13 @@ export default function Sidebar() {
                     ) : (
                       <div>
                         {/* Sign-in / Sign-up toggle */}
-                        <div className="flex rounded-lg p-1 mb-5 gap-1 border" style={SEG_WRAP}>
+                        <div className="flex rounded-full p-1 mb-5 gap-1 border" style={SEG_WRAP}>
                           {[
                             { key:'signin', label:'Sign In'  },
                             { key:'signup', label:'Sign Up'  },
                           ].map(t => (
                             <button key={t.key} onClick={() => setAuthTab(t.key)}
-                              className="flex-1 py-2 rounded-md text-sm font-bold border transition-all"
+                              className="flex-1 py-2 rounded-full text-sm font-semibold border transition-all"
                               style={authTab === t.key ? SEG_ON : SEG_OFF}>{t.label}</button>
                           ))}
                         </div>
@@ -296,14 +295,14 @@ export default function Sidebar() {
                                   </button>
                                 </div>
                               </div>
-                              {authError && <p role="alert" className="text-xs text-red-400 font-medium">{authError}</p>}
-                              <button type="submit" disabled={authLoading} className="btn-primary w-full justify-center py-3 mt-1">
+                              {authError && <p role="alert" className="text-xs font-medium" style={{ color:'rgb(var(--down))' }}>{authError}</p>}
+                              <button type="submit" disabled={authLoading} className="btn-primary w-full justify-center !py-2.5 mt-1">
                                 {authLoading ? <><Loader2 size={14} className="animate-spin" /> Signing in…</> : <><LogIn size={14} /> Sign in</>}
                               </button>
                               <p className="text-xs text-center" style={{ color:'var(--text-3)' }}>
                                 No account?{' '}
                                 <button type="button" onClick={() => setAuthTab('signup')}
-                                  className="font-semibold hover:underline" style={{ color:'var(--accent)' }}>
+                                  className="font-semibold hover:underline" style={{ color:'var(--link)' }}>
                                   Create one
                                 </button>
                               </p>
@@ -341,14 +340,14 @@ export default function Sidebar() {
                                   </button>
                                 </div>
                               </div>
-                              {authError && <p role="alert" className="text-xs text-red-400 font-medium">{authError}</p>}
-                              <button type="submit" disabled={authLoading} className="btn-primary w-full justify-center py-3 mt-1">
+                              {authError && <p role="alert" className="text-xs font-medium" style={{ color:'rgb(var(--down))' }}>{authError}</p>}
+                              <button type="submit" disabled={authLoading} className="btn-primary w-full justify-center !py-2.5 mt-1">
                                 {authLoading ? <><Loader2 size={14} className="animate-spin" /> Creating account…</> : <><UserPlus size={14} /> Create account</>}
                               </button>
                               <p className="text-xs text-center" style={{ color:'var(--text-3)' }}>
                                 Already have one?{' '}
                                 <button type="button" onClick={() => setAuthTab('signin')}
-                                  className="font-semibold hover:underline" style={{ color:'var(--accent)' }}>
+                                  className="font-semibold hover:underline" style={{ color:'var(--link)' }}>
                                   Sign in
                                 </button>
                               </p>
@@ -374,10 +373,10 @@ export default function Sidebar() {
                         }
                         <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Appearance</span>
                       </div>
-                      <div className="flex rounded-lg p-1 gap-1 border" style={SEG_WRAP}>
+                      <div className="flex rounded-full p-1 gap-1 border" style={SEG_WRAP}>
                         {THEME_OPTIONS.map(({ key, label, icon: Icon }) => (
                           <button key={key} onClick={() => setTheme(key)}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-md text-xs font-bold border transition-all"
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-full text-xs font-semibold border transition-all"
                             style={theme === key ? SEG_ON : SEG_OFF}>
                             <Icon size={12} />
                             {label}
@@ -419,10 +418,10 @@ export default function Sidebar() {
                         <Type size={15} style={{ color:'var(--text-2)' }} />
                         <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Text Size</span>
                       </div>
-                      <div className="flex rounded-lg p-1 gap-1 border" style={SEG_WRAP}>
+                      <div className="flex rounded-full p-1 gap-1 border" style={SEG_WRAP}>
                         {FONT_SIZES.map(s => (
                           <button key={s.key} onClick={() => setFontSize(s.key)}
-                            className="flex-1 py-2.5 rounded-md text-sm font-bold transition-all border"
+                            className="flex-1 py-2.5 rounded-full text-sm font-semibold transition-all border"
                             style={fontSize === s.key ? SEG_ON : SEG_OFF}>{s.label}</button>
                         ))}
                       </div>

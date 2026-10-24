@@ -1,21 +1,65 @@
 import { useState, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
-import { Search, TrendingUp, TrendingDown, Filter, Activity } from 'lucide-react'
+import { Search, ChevronRight } from 'lucide-react'
 import { stocks as baseStocks, sectorPerformance } from '../data/mockData'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
 import { useLiveIndices } from '../hooks/useLiveIndices'
-import { fmtPrice, fmtPct, fmtChange, changeColor } from '../utils/formatLive'
+import { fmtPrice, fmtPct, fmtChange } from '../utils/formatLive'
 import { usSession } from '../utils/marketHours'
 import PageHeader, { StatusPill } from '../components/PageHeader'
 
 const SECTORS = ['All','Technology','Healthcare','Financials','Cons. Disc.','Communication','Energy']
+const tone = v => v == null ? 'var(--text-3)' : v >= 0 ? 'rgb(var(--up))' : 'rgb(var(--down))'
+
+/* ── Screener pieces ─────────────────────────────────────────── */
+function SectionHead({ children, aside }) {
+  return (
+    <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+      <span className="section-title">{children}<ChevronRight size={18} style={{ color:'var(--text-3)' }}/></span>
+      {aside}
+    </div>
+  )
+}
+
+const MOVER_COLS = ['Symbol','Name','Price','Change','Change %']
+
+function MoversTable({ rows, empty }) {
+  if (!rows.length) return <p className="py-8 text-sm text-center border-y" style={{ color:'var(--text-3)', borderColor:'var(--border)' }}>{empty}</p>
+  return (
+    <div className="overflow-x-auto border-t" style={{ borderColor:'var(--border)' }}>
+      <table className="w-full min-w-[520px]">
+        <thead>
+          <tr className="border-b" style={{ borderColor:'var(--border)' }}>
+            {MOVER_COLS.map((h, i) => (
+              <th key={h} scope="col" className={`th whitespace-nowrap ${i < 2 ? 'text-left' : 'text-right'}`}
+                style={{ paddingLeft: i === 0 ? 0 : undefined }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(s => (
+            <tr key={s.symbol} className="asset-row border-b" style={{ borderColor:'var(--border)' }}>
+              <td className="td whitespace-nowrap" style={{ paddingLeft:0 }}>
+                <Link to={`/stock/${s.symbol}`} className="link font-bold text-[13px]">{s.symbol}</Link>
+              </td>
+              <td className="td text-[13px] truncate max-w-[180px]" style={{ color:'var(--text-2)' }}>{s.name}</td>
+              <td className="td text-right num font-bold text-[13px] whitespace-nowrap">{fmtPrice(s.price)}</td>
+              <td className="td text-right num text-[13px] font-semibold whitespace-nowrap" style={{ color: tone(s.change) }}>{fmtChange(s.change)}</td>
+              <td className="td text-right num text-[13px] font-semibold whitespace-nowrap" style={{ color: tone(s.changePct) }}>{fmtPct(s.changePct)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 export default function Markets() {
   const [search, setSearch] = useState('')
   const [sector, setSector] = useState('All')
   const [sortBy, setSortBy] = useState('mktCap')
+  const [moversTab, setMoversTab] = useState('gainers')
 
   /* Live prices for every stock in our universe */
   const symbols = useMemo(() => baseStocks.map(s => s.symbol), [])
@@ -46,7 +90,7 @@ export default function Markets() {
   const ranked = stocks.filter(s => s.changePct != null)
   const gainers = [...ranked].sort((a,b) => b.changePct - a.changePct).slice(0,5)
   const losers  = [...ranked].sort((a,b) => a.changePct - b.changePct).slice(0,5)
-  const mostActive = [...ranked].sort((a,b) => Math.abs(b.changePct) - Math.abs(a.changePct)).slice(0,4)
+  const mostActive = [...ranked].sort((a,b) => Math.abs(b.changePct) - Math.abs(a.changePct)).slice(0,5)
 
   /* Live index proxies (SPY/QQQ/DIA); names with a dash until they load */
   const { indices: liveIndices, isLive: indicesLive } = useLiveIndices(60_000)
@@ -59,8 +103,17 @@ export default function Markets() {
       }))
     : ['S&P 500', 'NASDAQ', 'Dow Jones'].map(name => ({ name, value:'—', change:'', up:true }))
 
+  const MOVERS = {
+    gainers:    { label:'Top gainers',    rows:gainers,    empty:'No live prices yet. Gainers appear once quotes load.' },
+    losers:     { label:'Top losers',     rows:losers,     empty:'No live prices yet. Losers appear once quotes load.' },
+    mostActive: { label:'Biggest movers', rows:mostActive, empty:'No live prices yet. Movers appear once quotes load.' },
+  }
+  const mv = MOVERS[moversTab]
+  const advancing = stocks.filter(s => s.changePct != null && s.changePct >= 0).length
+  const declining = stocks.filter(s => s.changePct != null && s.changePct < 0).length
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6 page-enter">
+    <div className="max-w-[1320px] mx-auto px-4 sm:px-6 py-6 space-y-8 page-enter">
 
       {/* ── Header ── */}
       <PageHeader title="Markets" subtitle="Equities across the US, Europe and Asia Pacific, ranked by today's move.">
@@ -68,154 +121,92 @@ export default function Markets() {
         <StatusPill tone={session.open ? 'live' : 'muted'} pulse={session.open}>{session.label}</StatusPill>
       </PageHeader>
 
-      {/* ── Index cards ── */}
-      <div>
-      <div className="section-label mb-2.5">Indices</div>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-3">
-        {indexCards.map((idx, i) => (
-          <motion.div
-            key={idx.name}
-            initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
-            transition={{ delay: i * 0.05 }}
-            className="idx-card"
-          >
-            <div className="section-label mb-1.5 truncate">{idx.name}</div>
-            <div className="font-black font-mono text-base tracking-tight" style={{ color:'var(--text-1)' }}>
-              {idx.value}
+      {/* ── Indices ── */}
+      <section aria-label="Indices">
+        <div className="grid grid-cols-1 sm:grid-cols-3 border-y" style={{ borderColor:'var(--border)' }}>
+          {indexCards.map((idx, i) => (
+            <div key={idx.name} className={`py-3 ${i > 0 ? 'border-t sm:border-t-0 sm:border-l sm:pl-4' : ''} sm:pr-4`}
+              style={{ borderColor:'var(--border)' }}>
+              <div className="text-[13px] font-semibold link truncate">{idx.name}</div>
+              <div className="num font-bold text-xl mt-0.5" style={{ color:'var(--text-1)' }}>{idx.value}</div>
+              <div className="num text-[13px] font-semibold mt-0.5"
+                style={{ color: idx.change ? (idx.up ? 'rgb(var(--up))' : 'rgb(var(--down))') : 'var(--text-3)' }}>
+                {idx.change || 'Waiting for prices'}
+              </div>
             </div>
-            <div className={`text-xs font-bold font-mono mt-0.5 ${idx.change ? (idx.up ? 'text-emerald-400' : 'text-red-400') : ''}`}
-              style={idx.change ? undefined : { color:'var(--text-3)' }}>
-              {idx.change || 'Waiting for prices'}
-            </div>
-          </motion.div>
-        ))}
-      </div>
-      </div>
+          ))}
+        </div>
+      </section>
 
       {/* ── Movers + Sector ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-8">
 
-        {/* Gainers */}
-        <div className="card-flat overflow-hidden" style={{ padding:0 }}>
-          <div className="px-4 py-3 border-b flex items-center gap-2"
-            style={{ borderColor:'var(--border)', background:'var(--bg-2)' }}>
-            <TrendingUp size={14} className="text-emerald-400"/>
-            <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Top gainers</span>
-          </div>
-          <div style={{ background:'var(--bg-1)' }}>
-            {!gainers.length && <p className="px-4 py-8 text-sm text-center" style={{ color:'var(--text-3)' }}>No live prices yet. Gainers appear once quotes load.</p>}
-            {gainers.map((s, i) => (
-              <Link key={s.symbol} to={`/stock/${s.symbol}`}
-                className="flex items-center justify-between px-4 py-2.5 border-b transition-colors hover:bg-emerald-400/5 group last:border-b-0"
-                style={{ borderColor:'var(--border)' }}>
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-md flex items-center justify-center text-xs font-black shrink-0"
-                    style={{ background:'rgb(var(--up) / .1)', color:'rgb(var(--up))' }}>
-                    {s.symbol.charAt(0)}
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold group-hover:text-emerald-400 transition-colors"
-                      style={{ color:'var(--text-1)' }}>{s.symbol}</div>
-                    <div className="text-xs truncate max-w-[110px]" style={{ color:'var(--text-3)' }}>{s.name}</div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-mono font-semibold" style={{ color:'var(--text-1)' }}>
-                    {fmtPrice(s.price)}
-                  </div>
-                  <span className="badge-green text-xs">{fmtPct(s.changePct)}</span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
+        {/* Movers screener */}
+        <section aria-label="Market movers" className="min-w-0">
+          <SectionHead aside={
+            <div className="flex gap-1 flex-wrap" role="tablist">
+              {Object.entries(MOVERS).map(([k, m]) => (
+                <button key={k} role="tab" aria-selected={moversTab === k} onClick={() => setMoversTab(k)}
+                  className="px-3 py-1.5 rounded-full text-[13px] font-semibold transition-colors"
+                  style={moversTab === k ? { background:'var(--btn-bg)', color:'var(--btn-fg)' } : { color:'var(--text-2)' }}>
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          }>{mv.label}</SectionHead>
+          <MoversTable rows={mv.rows} empty={mv.empty}/>
+          {moversTab === 'mostActive' && mv.rows.length > 0 && (
+            <p className="text-[11px] mt-2" style={{ color:'var(--text-3)' }}>Ranked by the size of today's move, up or down.</p>
+          )}
+        </section>
 
-        {/* Losers */}
-        <div className="card-flat overflow-hidden" style={{ padding:0 }}>
-          <div className="px-4 py-3 border-b flex items-center gap-2"
-            style={{ borderColor:'var(--border)', background:'var(--bg-2)' }}>
-            <TrendingDown size={14} className="text-red-400"/>
-            <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Top losers</span>
-          </div>
-          <div style={{ background:'var(--bg-1)' }}>
-            {!losers.length && <p className="px-4 py-8 text-sm text-center" style={{ color:'var(--text-3)' }}>No live prices yet. Losers appear once quotes load.</p>}
-            {losers.map((s, i) => (
-              <Link key={s.symbol} to={`/stock/${s.symbol}`}
-                className="flex items-center justify-between px-4 py-2.5 border-b transition-colors hover:bg-red-400/5 group last:border-b-0"
-                style={{ borderColor:'var(--border)' }}>
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-md flex items-center justify-center text-xs font-black shrink-0"
-                    style={{ background:'rgb(var(--down) / .1)', color:'rgb(var(--down))' }}>
-                    {s.symbol.charAt(0)}
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold group-hover:text-red-400 transition-colors"
-                      style={{ color:'var(--text-1)' }}>{s.symbol}</div>
-                    <div className="text-xs truncate max-w-[110px]" style={{ color:'var(--text-3)' }}>{s.name}</div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-mono font-semibold" style={{ color:'var(--text-1)' }}>
-                    {fmtPrice(s.price)}
-                  </div>
-                  <span className="badge-red text-xs">{fmtPct(s.changePct)}</span>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* Sector Performance */}
-        <div className="card-flat">
-          <div className="flex items-center gap-2 mb-4">
-            <Activity size={14} style={{ color:'var(--accent)' }}/>
-            <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>Sector performance</span>
-            <span className="section-label ml-auto">Sample figures</span>
-          </div>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={sectorPerformance} layout="vertical" margin={{ left:0, right:28 }}>
-              <XAxis type="number" tick={{ fontSize:10, fill:'var(--text-3)' }}
-                tickFormatter={v=>`${v>0?'+':''}${v}%`} axisLine={false} tickLine={false}/>
-              <YAxis type="category" dataKey="name" tick={{ fontSize:10, fill:'var(--text-2)' }}
-                width={94} axisLine={false} tickLine={false}/>
-              <Tooltip
+        {/* Sector performance */}
+        <section aria-label="Sector performance" className="min-w-0">
+          <SectionHead aside={<span className="text-[11px]" style={{ color:'var(--text-3)' }}>Sample figures</span>}>Sector performance</SectionHead>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={sectorPerformance} layout="vertical" margin={{ left:0, right:44 }} barCategoryGap={9}>
+              <XAxis type="number" hide domain={['dataMin - 0.3', 'dataMax + 0.3']}/>
+              <YAxis type="category" dataKey="name" tick={{ fontSize:11, fill:'var(--text-3)' }}
+                width={92} axisLine={false} tickLine={false}/>
+              <Tooltip cursor={{ fill:'var(--bg-1)' }}
                 formatter={v => [`${v > 0 ? '+' : ''}${v.toFixed(2)}%`, 'Change']}
                 contentStyle={{ background:'var(--bg-2)', border:'1px solid var(--border)', borderRadius:8, fontSize:12, color:'var(--text-1)' }}
               />
-              <Bar dataKey="change" radius={[0,4,4,0]}>
+              <Bar dataKey="change" barSize={6} radius={3}
+                label={{ position:'right', fontSize:11, fill:'var(--text-2)', formatter: v => `${v > 0 ? '+' : ''}${v.toFixed(2)}%` }}>
                 {sectorPerformance.map((e,i) => <Cell key={i} fill={e.change >= 0 ? 'rgb(var(--up))' : 'rgb(var(--down))'}/>)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </section>
       </div>
 
-      {/* ── Stock table ── */}
-      <div className="rounded-xl overflow-hidden border" style={{ borderColor:'var(--border)' }}>
+      {/* ── All stocks ── */}
+      <section aria-label="All stocks">
+        <SectionHead>All stocks</SectionHead>
+
         {/* Controls */}
-        <div className="px-4 py-3 border-b flex flex-col sm:flex-row gap-3 flex-wrap"
-          style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
-          <div className="relative flex-1 max-w-xs">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color:'var(--text-3)' }}/>
-            <input aria-label="Search stocks" className="input text-sm pl-9 py-2" placeholder="Search symbol or name"
+        <div className="flex flex-col md:flex-row md:items-center gap-3 mb-3">
+          <div className="relative w-full md:max-w-xs">
+            <Search size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color:'var(--text-3)' }}/>
+            <input aria-label="Search stocks" className="input text-sm pl-9 py-2 rounded-full" placeholder="Search symbol or name"
               value={search} onChange={e => setSearch(e.target.value)}/>
           </div>
-          <div className="flex items-center gap-1 flex-wrap">
-            <Filter size={12} style={{ color:'var(--text-3)' }}/>
+          <div className="flex items-center gap-1.5 overflow-x-auto md:flex-wrap pb-1 md:pb-0">
             {SECTORS.map(s => (
-              <button key={s} onClick={() => setSector(s)}
-                className="text-xs px-2.5 py-1.5 rounded-md font-semibold transition-colors"
+              <button key={s} onClick={() => setSector(s)} aria-pressed={sector === s}
+                className="text-[13px] px-3 py-1.5 rounded-full font-semibold transition-colors whitespace-nowrap shrink-0"
                 style={sector === s
-                  ? { background:'rgba(var(--accent-rgb),.12)', color:'var(--text-1)', border:'1px solid rgba(var(--accent-rgb),.25)' }
-                  : { background:'transparent', color:'var(--text-2)', border:'1px solid transparent' }
+                  ? { background:'var(--btn-bg)', color:'var(--btn-fg)', border:'1px solid var(--btn-bg)' }
+                  : { background:'transparent', color:'var(--text-2)', border:'1px solid var(--border-light)' }
                 }>{s}</button>
             ))}
           </div>
-          <div className="flex items-center gap-2 ml-auto shrink-0">
-            <span className="text-xs" style={{ color:'var(--text-3)' }}>Sort</span>
-            <select aria-label="Sort by" value={sortBy} onChange={e => setSortBy(e.target.value)}
-              className="text-xs px-2.5 py-1.5 rounded-md border outline-none cursor-pointer"
-              style={{ background:'var(--bg-1)', borderColor:'var(--border)', color:'var(--text-2)' }}>
+          <div className="flex items-center gap-2 md:ml-auto shrink-0">
+            <label htmlFor="markets-sort" className="text-xs" style={{ color:'var(--text-3)' }}>Sort by</label>
+            <select id="markets-sort" value={sortBy} onChange={e => setSortBy(e.target.value)}
+              className="text-[13px] font-semibold px-3 py-1.5 rounded-full border outline-none cursor-pointer"
+              style={{ background:'var(--bg-2)', borderColor:'var(--border-light)', color:'var(--text-1)' }}>
               <option value="mktCap">Mkt Cap</option>
               <option value="changePct">% Change</option>
               <option value="price">Price</option>
@@ -223,78 +214,36 @@ export default function Markets() {
           </div>
         </div>
 
-        <div className="overflow-x-auto" style={{ background:'var(--bg-1)' }}>
-          <table className="w-full">
+        <div className="overflow-auto max-h-[75vh] border-y" style={{ borderColor:'var(--border)' }}>
+          <table className="w-full min-w-[820px]">
             <thead>
-              <tr className="border-b" style={{ borderColor:'var(--border)', background:'var(--bg-2)' }}>
-                {['Asset','Price','Change','Volume','Mkt Cap','Sector','P/E'].map((h, i) => (
-                  <th key={h} className={`th ${i === 0 ? 'text-left' : 'text-right'}
-                    ${['Volume','Sector'].includes(h) ? 'hidden sm:table-cell' : ''}
-                    ${['Mkt Cap','P/E'].includes(h) ? 'hidden md:table-cell' : ''}`}>
+              <tr>
+                {['Symbol','Name','Price','Change','Change %','Sector'].map((h, i) => (
+                  <th key={h} scope="col"
+                    className={`th whitespace-nowrap sticky top-0 z-10 border-b ${i < 2 || h === 'Sector' ? 'text-left' : 'text-right'}`}
+                    style={{ background:'var(--bg-0)', borderColor:'var(--border)', paddingLeft: i === 0 ? 0 : undefined }}>
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map((s, i) => (
-                <motion.tr key={s.symbol}
-                  initial={{ opacity:0 }} animate={{ opacity:1 }}
-                  transition={{ delay: Math.min(i * 0.015, 0.4) }}
-                  className="tr border-b" style={{ borderColor:'var(--border)' }}>
-                  <td className="td">
-                    <Link to={`/stock/${s.symbol}`} className="flex items-center gap-3 group">
-                      <div className="w-8 h-8 rounded-md flex items-center justify-center text-xs font-black shrink-0"
-                        style={{ background:`rgba(var(--accent-rgb),.1)`, color:'var(--accent)', border:`1px solid rgba(var(--accent-rgb),.15)` }}>
-                        {s.symbol.charAt(0)}
-                      </div>
-                      <div>
-                        <div className="font-bold text-sm group-hover:text-accent transition-colors" style={{ color:'var(--text-1)' }}>
-                          {s.symbol}
-                          {s.region && s.region !== 'US' && (
-                            <span className="ml-1.5 text-xs font-normal" style={{ color:'var(--text-3)' }}>
-                              {s.exchange}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs truncate max-w-[150px]" style={{ color:'var(--text-3)' }}>
-                          {s.name}
-                        </div>
-                      </div>
-                    </Link>
-                  </td>
-                  <td className="td text-right">
-                    <span className="font-mono font-bold text-sm" style={{ color: s.price != null ? 'var(--text-1)' : 'var(--text-3)' }}>
-                      {fmtPrice(s.price)}
-                    </span>
-                  </td>
-                  <td className="td text-right">
-                    <div className={`text-sm font-bold font-mono ${changeColor(s.changePct)}`}>
-                      {fmtPct(s.changePct)}
-                    </div>
-                    {s.change != null && (
-                      <div className={`text-xs font-mono ${s.change >= 0 ? 'text-emerald-400/60' : 'text-red-400/60'}`}>
-                        {fmtChange(s.change)}
-                      </div>
+              {filtered.map(s => (
+                <tr key={s.symbol} className="asset-row border-b" style={{ borderColor:'var(--border)' }}>
+                  <td className="td whitespace-nowrap" style={{ paddingLeft:0 }}>
+                    <Link to={`/stock/${s.symbol}`} className="link font-bold text-[13px]">{s.symbol}</Link>
+                    {s.region && s.region !== 'US' && (
+                      <span className="ml-1.5 text-xs font-normal" style={{ color:'var(--text-3)' }}>{s.exchange}</span>
                     )}
                   </td>
-                  <td className="td text-right hidden sm:table-cell">
-                    <span className="text-sm font-mono" style={{ color:'var(--text-2)' }}>{s.volume}</span>
+                  <td className="td text-[13px] truncate max-w-[200px]" style={{ color:'var(--text-2)' }}>{s.name}</td>
+                  <td className="td text-right num font-bold text-[13px] whitespace-nowrap" style={{ color: s.price != null ? 'var(--text-1)' : 'var(--text-3)' }}>
+                    {fmtPrice(s.price)}
                   </td>
-                  <td className="td text-right hidden md:table-cell">
-                    <span className="text-sm font-mono font-semibold" style={{ color:'var(--text-1)' }}>{s.mktCap}</span>
-                  </td>
-                  <td className="td text-right hidden sm:table-cell">
-                    <span className="text-xs px-2 py-0.5 rounded-md" style={{ background:'var(--bg-3)', color:'var(--text-3)' }}>
-                      {s.sector}
-                    </span>
-                  </td>
-                  <td className="td text-right hidden md:table-cell">
-                    <span className="text-sm font-mono" style={{ color:'var(--text-2)' }}>
-                      {s.pe ? `${s.pe}x` : '—'}
-                    </span>
-                  </td>
-                </motion.tr>
+                  <td className="td text-right num text-[13px] font-semibold whitespace-nowrap" style={{ color: tone(s.change) }}>{fmtChange(s.change)}</td>
+                  <td className="td text-right num text-[13px] font-semibold whitespace-nowrap" style={{ color: tone(s.changePct) }}>{fmtPct(s.changePct)}</td>
+                  <td className="td text-[13px] whitespace-nowrap" style={{ color:'var(--text-3)' }}>{s.sector}</td>
+                </tr>
               ))}
             </tbody>
           </table>
@@ -305,16 +254,15 @@ export default function Markets() {
           )}
         </div>
 
-        <div className="px-4 py-2.5 flex items-center justify-between"
-          style={{ background:'var(--bg-2)', borderTop:`1px solid var(--border)` }}>
+        <div className="pt-3 flex items-center justify-between gap-3 flex-wrap">
           <span className="text-xs" style={{ color:'var(--text-3)' }}>
-            {filtered.length} securities · {stocks.filter(s => s.changePct != null && s.changePct >= 0).length} advancing · {stocks.filter(s => s.changePct != null && s.changePct < 0).length} declining
+            {filtered.length} securities · {advancing} advancing · {declining} declining
           </span>
-          <span className="text-xs font-mono" style={{ color:'var(--text-3)' }}>
+          <span className="text-xs num" style={{ color:'var(--text-3)' }}>
             {lastUpdated ? `Updated ${new Date(lastUpdated).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}` : isLive ? 'Showing last saved prices' : 'Waiting for prices'}
           </span>
         </div>
-      </div>
+      </section>
 
     </div>
   )

@@ -13,7 +13,7 @@ const ACCENT_COLORS = {
   clay:     { name: 'Clay',     value: '#d9805c', rgb: '217,128,92',  light: { value: '#a4492a', rgb: '164,73,42'   } },
   cream:    { name: 'Cream',    value: '#e9dfca', rgb: '233,223,202', light: { value: '#2e4a57', rgb: '46,74,87'    } },
 }
-const DEFAULT_ACCENT = 'marigold'
+const DEFAULT_ACCENT = 'steel'
 
 function getSystemScheme() {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
@@ -21,7 +21,8 @@ function getSystemScheme() {
 
 export function AppProvider({ children }) {
   // 'dark' | 'light' | 'system'
-  const [theme, setTheme]       = useState(() => localStorage.getItem('foliyo_theme') || 'dark')
+  // v2 key: the old one was written on every visit, so it can't tell a choice from the old dark default
+  const [theme, setTheme]       = useState(() => localStorage.getItem('foliyo_theme_v2') || 'light')
   const [systemDark, setSystemDark] = useState(() => window.matchMedia('(prefers-color-scheme: dark)').matches)
   // Accents saved before the rebrand (cyan, violet…) no longer exist — fall back to marigold
   const [accent, setAccent]     = useState(() => {
@@ -69,7 +70,7 @@ export function AppProvider({ children }) {
 
   // Apply theme + accent + font to DOM
   useEffect(() => {
-    localStorage.setItem('foliyo_theme', theme)
+    localStorage.setItem('foliyo_theme_v2', theme)
     localStorage.setItem('foliyo_accent', accent)
     localStorage.setItem('foliyo_fontsize', fontSize)
 

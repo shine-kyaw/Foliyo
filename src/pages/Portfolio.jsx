@@ -15,32 +15,11 @@ const KEY = 'foliyo_portfolio'
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || '[]') } catch { return [] } }
 const save = d => persist(KEY, d)
 
-/* ── Deterministic portfolio history ─────────────────────────── */
-function buildHistory(holdings, days = 180) {
-  if (!holdings.length) return []
-  const totalCost  = holdings.reduce((s, h) => s + h.shares * h.avgCost, 0)
-  const totalValue = holdings.reduce((s, h) => s + h.shares * (h.currentPrice || h.avgCost), 0)
-  const endVal     = totalValue
-  const startVal   = totalCost * 0.97  // slight discount at start
-  const data = []
-  const now = new Date()
-  const returnAmt = endVal - startVal
-  const hasReturn = Math.abs(returnAmt) > startVal * 0.001
-  const noiseMag = hasReturn ? Math.abs(returnAmt) * 0.18 : 0
-
-  for (let i = days; i >= 0; i--) {
-    const d = new Date(now); d.setDate(d.getDate() - i)
-    const t = (days - i) / days
-    const seed = i * 1.37
-    const noise = Math.sin(seed) * noiseMag * 0.7 + Math.cos(seed * 1.6) * noiseMag * 0.3
-    const v = startVal + returnAmt * t + noise
-    data.push({
-      date: d.toLocaleDateString('en-US', { month:'short', day:'numeric' }),
-      value: parseFloat(Math.max(v, startVal * 0.85).toFixed(2)),
-    })
-  }
-  return data
-}
+/* ── Helpers ─────────────────────────────────────────────────── */
+const tone = v => v >= 0 ? 'rgb(var(--up))' : 'rgb(var(--down))'
+const money = (v, d = 2) => v.toLocaleString('en-US', { minimumFractionDigits:d, maximumFractionDigits:d })
+const signedMoney = v => `${v >= 0 ? '+' : '-'}$${money(Math.abs(v))}`
+const signedPct = v => `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`
 
 /* ── Tooltip ─────────────────────────────────────────────────── */
 const ChartTip = ({ active, payload, label }) => {
@@ -48,7 +27,7 @@ const ChartTip = ({ active, payload, label }) => {
   return (
     <div className="rounded-lg px-3 py-2 text-xs border" style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
       <p style={{ color:'var(--text-3)' }}>{label}</p>
-      <p className="font-bold font-mono" style={{ color:'var(--text-1)' }}>
+      <p className="font-bold num" style={{ color:'var(--text-1)' }}>
         ${payload[0]?.value?.toLocaleString('en-US', { minimumFractionDigits:2 })}
       </p>
     </div>
@@ -105,25 +84,27 @@ function AddPositionModal({ onAdd, onClose, existing }) {
     <motion.div
       initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background:'rgba(10,10,12,0.6)' }}
+      style={{ background:'rgba(17,18,21,0.45)' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
       <motion.div
-        initial={{ scale:0.94, y:24 }} animate={{ scale:1, y:0 }} exit={{ scale:0.94, y:24 }}
-        className="w-full max-w-md rounded-xl border p-6 relative"
-        style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
+        role="dialog" aria-modal="true" aria-labelledby="add-position-title"
+        initial={{ scale:0.97, y:16 }} animate={{ scale:1, y:0 }} exit={{ scale:0.97, y:16 }}
+        className="w-full max-w-md rounded-[14px] border p-6 relative"
+        style={{ background:'var(--bg-2)', borderColor:'var(--border)', boxShadow:'0 20px 50px rgba(var(--shadow-color), 0.18)' }}>
         <button onClick={onClose} aria-label="Close"
-          className="absolute top-4 right-4 w-7 h-7 rounded-md flex items-center justify-center"
-          style={{ color:'var(--text-3)', background:'var(--bg-3)' }}>
+          className="absolute top-4 right-4 w-8 h-8 rounded-full flex items-center justify-center transition-colors hover:bg-[var(--border)]"
+          style={{ color:'var(--text-2)', background:'var(--bg-3)' }}>
           <X size={14}/>
         </button>
-        <h2 className="text-lg font-black mb-5" style={{ color:'var(--text-1)' }}>Add position</h2>
+        <h2 id="add-position-title" className="text-[1.5rem] font-bold mb-5" style={{ color:'var(--text-1)' }}>Add position</h2>
 
         {/* Stock search */}
         <div className="relative mb-4">
-          <label className="block text-xs font-semibold mb-1.5" style={{ color:'var(--text-3)' }}>Stock</label>
+          <label htmlFor="pf-stock" className="block text-xs font-semibold mb-1.5" style={{ color:'var(--text-3)' }}>Stock</label>
           <div className="relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color:'var(--text-3)' }}/>
-            <input className="input pl-9 w-full" placeholder="Search ticker or company…"
+            <Search size={13} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color:'var(--text-3)' }}/>
+            <input id="pf-stock" className="input pl-9 w-full" placeholder="Search ticker or company…"
+              autoComplete="off"
               value={query}
               onChange={e => { setQuery(e.target.value); setSelected(null) }}
               onFocus={() => setFocused(true)}
@@ -132,21 +113,17 @@ function AddPositionModal({ onAdd, onClose, existing }) {
           <AnimatePresence>
             {focused && results.length > 0 && (
               <motion.div initial={{ opacity:0, y:4 }} animate={{ opacity:1, y:0 }} exit={{ opacity:0 }}
-                className="absolute z-50 w-full mt-1 rounded-lg border shadow-xl overflow-hidden"
-                style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
-                {results.map(s => (
+                className="absolute z-50 w-full mt-1 rounded-[10px] border overflow-hidden"
+                style={{ background:'var(--bg-2)', borderColor:'var(--border-light)', boxShadow:'0 8px 24px rgba(var(--shadow-color), 0.12)' }}>
+                {results.map((s, i) => (
                   <button key={s.symbol} onMouseDown={() => handleSelect(s)}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-[var(--bg-3)] transition-colors"
-                    style={{ borderBottom:'1px solid var(--border)' }}>
-                    <div className="w-7 h-7 rounded-md flex items-center justify-center text-xs font-black"
-                      style={{ background:`rgba(var(--accent-rgb),.1)`, color:'var(--accent)' }}>
-                      {s.symbol.charAt(0)}
-                    </div>
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-[var(--bg-1)] transition-colors"
+                    style={{ borderBottom: i < results.length - 1 ? '1px solid var(--border)' : 'none' }}>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold" style={{ color:'var(--text-1)' }}>{s.symbol}</div>
+                      <div className="text-sm font-bold" style={{ color:'var(--link)' }}>{s.symbol}</div>
                       <div className="text-xs truncate" style={{ color:'var(--text-3)' }}>{s.name}</div>
                     </div>
-                    <span className="text-sm font-mono font-semibold" style={{ color: s.price != null ? 'var(--text-2)' : 'var(--text-3)' }}>
+                    <span className="text-sm num font-semibold" style={{ color: s.price != null ? 'var(--text-1)' : 'var(--text-3)' }}>
                       {s.price != null ? `$${s.price.toFixed(2)}` : '—'}
                     </span>
                   </button>
@@ -158,37 +135,36 @@ function AddPositionModal({ onAdd, onClose, existing }) {
 
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color:'var(--text-3)' }}>Shares</label>
-            <input className="input w-full" type="number" placeholder="0" min="0" step="1"
+            <label htmlFor="pf-shares" className="block text-xs font-semibold mb-1.5" style={{ color:'var(--text-3)' }}>Shares</label>
+            <input id="pf-shares" className="input w-full" type="number" placeholder="0" min="0" step="1"
               value={shares} onChange={e => setShares(e.target.value)}/>
           </div>
           <div>
-            <label className="block text-xs font-semibold mb-1.5" style={{ color:'var(--text-3)' }}>Avg Cost / Share</label>
-            <input className="input w-full" type="number" placeholder="0.00" min="0" step="0.01"
+            <label htmlFor="pf-cost" className="block text-xs font-semibold mb-1.5" style={{ color:'var(--text-3)' }}>Avg cost / share</label>
+            <input id="pf-cost" className="input w-full" type="number" placeholder="0.00" min="0" step="0.01"
               value={avgCost} onChange={e => setAvgCost(e.target.value)}/>
           </div>
         </div>
 
         {/* Preview */}
         {estValue !== null && (
-          <div className="rounded-lg p-3 mb-4 grid grid-cols-2 gap-3 text-xs"
-            style={{ background:'var(--bg-3)' }}>
+          <dl className="grid grid-cols-2 gap-3 py-3 mb-4 border-y text-xs" style={{ borderColor:'var(--border)' }}>
             <div>
-              <div style={{ color:'var(--text-3)' }}>Current Value</div>
-              <div className="font-black font-mono text-sm mt-0.5" style={{ color:'var(--text-1)' }}>
+              <dt style={{ color:'var(--text-3)' }}>Market value</dt>
+              <dd className="font-bold num text-base mt-0.5" style={{ color:'var(--text-1)' }}>
                 ${estValue.toLocaleString('en-US', { minimumFractionDigits:2 })}
-              </div>
+              </dd>
             </div>
             <div>
-              <div style={{ color:'var(--text-3)' }}>Unrealized P&L</div>
-              <div className={`font-black font-mono text-sm mt-0.5 ${estReturn >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+              <dt style={{ color:'var(--text-3)' }}>Unrealized P&amp;L</dt>
+              <dd className="font-bold num text-base mt-0.5" style={{ color: tone(estReturn) }}>
                 {estReturn >= 0 ? '+' : ''}${estReturn.toFixed(2)}
-              </div>
+              </dd>
             </div>
-          </div>
+          </dl>
         )}
 
-        {err && <p className="text-xs text-red-400 mb-3" role="alert">{err}</p>}
+        {err && <p className="text-xs mb-3" role="alert" style={{ color:'rgb(var(--down))' }}>{err}</p>}
 
         <button onClick={handleSubmit}
           className="btn-primary w-full justify-center py-3">
@@ -201,12 +177,16 @@ function AddPositionModal({ onAdd, onClose, existing }) {
 
 /* ── Main page ───────────────────────────────────────────────── */
 export default function Portfolio() {
-  const [holdings, setHoldings] = useState(load)
-  const [range, setRange]       = useState('6M')
-  const [tab, setTab]           = useState('holdings')
+  const [saved, setHoldings]   = useState(load)
   const [showModal, setShowModal] = useState(false)
 
-  useEffect(() => { save(holdings) }, [holdings])
+  useEffect(() => { save(saved) }, [saved])
+
+  // Value positions at live prices; fall back to the price saved with the position
+  const { quotes: liveQuotes } = useBatchQuotes(saved.map(h => h.symbol), 60_000)
+  const holdings = saved.map(h => liveQuotes[h.symbol]?.price != null
+    ? { ...h, currentPrice: liveQuotes[h.symbol].price, live: true }
+    : { ...h, live: false })
 
   const addHolding = h => {
     setHoldings(prev => {
@@ -230,9 +210,6 @@ export default function Portfolio() {
   const totalGain    = totalValue - totalCost
   const totalGainPct = totalCost > 0 ? (totalGain / totalCost) * 100 : 0
 
-  const sliceMap = { '1M':30, '3M':90, '6M':180, '1Y':365 }
-  const history  = buildHistory(holdings, 180)
-  const histSlice = history.slice(-sliceMap[range])
 
   const sectorMap = {}
   holdings.forEach(h => { sectorMap[h.sector] = (sectorMap[h.sector] || 0) + h.shares * h.currentPrice })
@@ -240,23 +217,18 @@ export default function Portfolio() {
     name, value: parseFloat(((value / (totalValue || 1)) * 100).toFixed(1))
   }))
 
-  const summaryCards = [
-    { label:'Portfolio Value', value: totalValue > 0 ? `$${totalValue.toLocaleString('en-US',{minimumFractionDigits:2})}` : '—',
-      sub:'Total market value' },
-    { label:'Total Return',
-      value: totalGain >= 0 ? `+$${totalGain.toLocaleString('en-US',{minimumFractionDigits:2})}` : `-$${Math.abs(totalGain).toLocaleString('en-US',{minimumFractionDigits:2})}`,
-      sub: `${totalGainPct >= 0 ? '+' : ''}${totalGainPct.toFixed(2)}% all time`,
-      c: totalGain >= 0 ? 'rgb(var(--up))' : 'rgb(var(--down))' },
-    { label:'Cost Basis', value: totalCost > 0 ? `$${totalCost.toLocaleString('en-US',{minimumFractionDigits:2})}` : '—',
-      sub:'Total invested' },
-    { label:'Positions', value: holdings.length,
-      sub: `${holdings.filter(h => h.shares * h.currentPrice > h.shares * h.avgCost).length} winning` },
+  const winning = holdings.filter(h => h.shares * h.currentPrice > h.shares * h.avgCost).length
+  const stats = [
+    { label:'Total value',     value: totalValue > 0 ? `$${money(totalValue)}` : '—' },
+    { label:'Total gain/loss', value: signedMoney(totalGain), sub: signedPct(totalGainPct), c: tone(totalGain) },
+    { label:'Cost basis',      value: totalCost > 0 ? `$${money(totalCost)}` : '—' },
+    { label:'Positions',       value: String(holdings.length), sub: `${winning} in profit` },
   ]
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-5 page-enter">
+    <div className="max-w-[1320px] mx-auto px-4 sm:px-6 py-6 page-enter">
 
-      {/* Modal */}
+      {/* ── Modal ── */}
       <AnimatePresence>
         {showModal && (
           <AddPositionModal
@@ -267,8 +239,8 @@ export default function Portfolio() {
         )}
       </AnimatePresence>
 
-      {/* Header */}
-      <PageHeader title="Portfolio" subtitle="Track and manage your investment holdings" className="mb-2">
+      {/* ── Header ── */}
+      <PageHeader title="Portfolio" subtitle="Track and manage your investment holdings" className="mb-6">
         <button className="btn-primary" onClick={() => setShowModal(true)}>
           <Plus size={14}/> Add position
         </button>
@@ -276,195 +248,126 @@ export default function Portfolio() {
 
       {holdings.length === 0 ? (
         /* ── Empty state ── */
-        <motion.div initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
-          className="rounded-xl border p-12 sm:p-16 text-center"
-          style={{ background:'var(--bg-2)', borderColor:'var(--border)', borderStyle:'dashed' }}>
-          <h3 className="text-lg font-black mb-2" style={{ color:'var(--text-1)' }}>Add your first position</h3>
-          <p className="text-sm mb-6 max-w-sm mx-auto" style={{ color:'var(--text-2)' }}>
+        <div className="border-y py-12" style={{ borderColor:'var(--border)' }}>
+          <h2 className="text-[1.5rem] font-bold mb-2" style={{ color:'var(--text-1)' }}>Add your first position</h2>
+          <p className="text-sm mb-6 max-w-md" style={{ color:'var(--text-2)' }}>
             Log a stock with its share count and average cost to see value, gain or loss, and allocation. Or practise in the Simulator with virtual money.
           </p>
-          <div className="flex items-center justify-center gap-3 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
             <button className="btn-primary" onClick={() => setShowModal(true)}>
               <Plus size={14}/> Add position
             </button>
             <Link to="/simulator" className="btn-ghost">Try the Simulator</Link>
           </div>
-        </motion.div>
+        </div>
       ) : (
         <>
-          {/* Summary Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {summaryCards.map((c, i) => (
-              <motion.div key={c.label} initial={{ opacity:0, y:14 }} animate={{ opacity:1, y:0 }} transition={{ delay: i*0.07 }}
-                className="card-flat min-w-0">
-                <div className="section-label mb-2">{c.label}</div>
-                <div className="text-xl font-black font-mono truncate" style={{ color: c.c || 'var(--text-1)' }}>{c.value}</div>
-                <div className="text-xs font-mono mt-1" style={{ color:'var(--text-3)' }}>{c.sub}</div>
-              </motion.div>
+          {/* ── Summary stats ── */}
+          <dl className="grid grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-5 pb-6 mb-8 border-b" style={{ borderColor:'var(--border)' }}>
+            {stats.map(s => (
+              <div key={s.label} className="min-w-0">
+                <dt className="text-xs mb-1" style={{ color:'var(--text-3)' }}>{s.label}</dt>
+                <dd className="text-[1.6rem] sm:text-[2rem] font-bold num leading-tight truncate" style={{ color: s.c || 'var(--text-1)' }}>{s.value}</dd>
+                {s.sub && <div className="text-sm num font-semibold mt-0.5" style={{ color: s.c || 'var(--text-3)' }}>{s.sub}</div>}
+              </div>
             ))}
-          </div>
+          </dl>
 
-          {/* Chart + Donut */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="card-flat lg:col-span-2">
-              <div className="flex items-center justify-between mb-5">
-                <span className="font-bold text-sm" style={{ color:'var(--text-1)' }}>Performance</span>
-                <div className="flex gap-1">
-                  {['1M','3M','6M','1Y'].map(r => (
-                    <button key={r} onClick={() => setRange(r)}
-                      className="text-xs px-2.5 py-1.5 rounded-md font-semibold transition-colors"
-                      style={range === r
-                        ? { background:`rgba(var(--accent-rgb),.12)`, color:'var(--text-1)', border:`1px solid rgba(var(--accent-rgb),.25)` }
-                        : { color:'var(--text-2)', border:'1px solid transparent' }
-                      }>{r}</button>
-                  ))}
-                </div>
-              </div>
-              <ResponsiveContainer width="100%" height={220}>
-                <AreaChart data={histSlice}>
-                  <defs>
-                    <linearGradient id="portGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="var(--accent)" stopOpacity={0.2}/>
-                      <stop offset="95%" stopColor="var(--accent)" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid stroke="var(--border)" vertical={false}/>
-                  <XAxis dataKey="date" tick={{ fontSize:11, fill:'var(--text-3)' }}
-                    interval={Math.floor(histSlice.length / 5)} axisLine={false} tickLine={false}/>
-                  <YAxis tick={{ fontSize:11, fill:'var(--text-3)' }}
-                    tickFormatter={v => `$${(v/1000).toFixed(0)}k`} axisLine={false} tickLine={false}
-                    domain={['auto','auto']} width={44}/>
-                  <Tooltip content={<ChartTip/>}/>
-                  <Area type="monotone" dataKey="value" stroke="var(--accent)" strokeWidth={2} fill="url(#portGrad)"/>
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-
-            <div className="card-flat">
-              <div className="font-bold text-sm mb-4" style={{ color:'var(--text-1)' }}>Sector Allocation</div>
-              <ResponsiveContainer width="100%" height={160}>
-                <RPie>
-                  <Pie data={sectorData} cx="50%" cy="50%" innerRadius={46} outerRadius={72} paddingAngle={3} dataKey="value">
-                    {sectorData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]}/>)}
-                  </Pie>
-                  <Tooltip formatter={v => [`${v}%`, 'Allocation']}
-                    contentStyle={{ background:'var(--bg-2)', border:'1px solid var(--border)', borderRadius:8, fontSize:11 }}/>
-                </RPie>
-              </ResponsiveContainer>
-              <div className="space-y-2 mt-2">
-                {sectorData.map((s, i) => (
-                  <div key={s.name} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background:COLORS[i % COLORS.length] }}/>
-                      <span style={{ color:'var(--text-2)' }}>{s.name}</span>
-                    </div>
-                    <span className="font-mono font-semibold" style={{ color:'var(--text-1)' }}>{s.value}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Holdings Table */}
-          <div className="rounded-xl overflow-hidden border" style={{ borderColor:'var(--border)' }}>
-            <div className="px-5 py-3.5 border-b flex items-center gap-2"
-              style={{ background:'var(--bg-2)', borderColor:'var(--border)' }}>
-              {['holdings','performance'].map(t => (
-                <button key={t} onClick={() => setTab(t)}
-                  className="text-xs px-4 py-2 rounded-md font-semibold capitalize transition-colors"
-                  style={tab === t
-                    ? { background:`rgba(var(--accent-rgb),.12)`, color:'var(--text-1)', border:`1px solid rgba(var(--accent-rgb),.25)` }
-                    : { color:'var(--text-2)', border:'1px solid transparent' }
-                  }>{t}</button>
-              ))}
-            </div>
-            <div className="overflow-x-auto" style={{ background:'var(--bg-1)' }}>
-              <table className="w-full">
+          {/* ── Holdings table ── */}
+          <section className="mb-10" aria-label="Holdings">
+            <h2 className="section-title mb-1">Holdings</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px]">
                 <thead>
-                  <tr className="border-b" style={{ borderColor:'var(--border)', background:'var(--bg-2)' }}>
-                    {['Stock','Shares','Avg Cost','Current','Value','Gain/Loss','Alloc',''].map((h, i) => (
-                      <th key={i} className={`th ${i === 0 ? 'text-left' : 'text-right'} ${['Shares','Avg Cost'].includes(h) ? 'hidden sm:table-cell' : ''} ${h === 'Alloc' ? 'hidden md:table-cell' : ''}`}>{h}</th>
+                  <tr className="border-b" style={{ borderColor:'var(--border)' }}>
+                    {['Symbol','Shares','Avg cost','Last price','Market value','Gain/loss','Gain/loss %','Allocation'].map((h, i) => (
+                      <th key={h} scope="col" className={`th whitespace-nowrap ${i === 0 ? 'text-left' : 'text-right'}`}>{h}</th>
                     ))}
+                    <th scope="col" className="th w-12"><span className="sr-only">Remove</span></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {holdings.map((h, i) => {
+                  {holdings.map(h => {
                     const value    = h.shares * h.currentPrice
                     const cost     = h.shares * h.avgCost
                     const gainLoss = value - cost
                     const gainPct  = ((gainLoss / cost) * 100)
                     const alloc    = (value / totalValue) * 100
                     return (
-                      <motion.tr key={h.symbol} initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ delay: i*0.04 }}
-                        className="tr border-b" style={{ borderColor:'var(--border)' }}>
+                      <tr key={h.symbol} className="asset-row border-b" style={{ borderColor:'var(--border)' }}>
                         <td className="td">
-                          <Link to={`/stock/${h.symbol}`} className="flex items-center gap-3 group">
-                            <div className="w-9 h-9 rounded-lg flex items-center justify-center text-xs font-black shrink-0"
-                              style={{ background:`rgba(var(--accent-rgb),.1)`, color:'var(--accent)', border:`1px solid rgba(var(--accent-rgb),.18)` }}>
-                              {h.symbol.charAt(0)}
-                            </div>
-                            <div>
-                              <div className="font-bold text-sm" style={{ color:'var(--text-1)' }}>{h.symbol}</div>
-                              <div className="text-xs hidden sm:block" style={{ color:'var(--text-3)' }}>{h.name}</div>
-                            </div>
-                          </Link>
+                          <Link to={`/stock/${h.symbol}`} className="link font-bold">{h.symbol}</Link>
+                          <div className="text-xs truncate max-w-[200px]" style={{ color:'var(--text-3)' }}>{h.name}</div>
                         </td>
-                        <td className="td text-right hidden sm:table-cell">
-                          <span className="font-mono text-sm" style={{ color:'var(--text-2)' }}>{h.shares}</span>
-                        </td>
-                        <td className="td text-right hidden sm:table-cell">
-                          <span className="font-mono text-sm" style={{ color:'var(--text-2)' }}>${h.avgCost.toFixed(2)}</span>
-                        </td>
-                        <td className="td text-right">
-                          <span className="font-mono font-bold text-sm" style={{ color:'var(--text-1)' }}>${h.currentPrice.toFixed(2)}</span>
-                        </td>
-                        <td className="td text-right">
-                          <span className="font-mono font-bold text-sm" style={{ color:'var(--text-1)' }}>
-                            ${value.toLocaleString('en-US', { minimumFractionDigits:2 })}
-                          </span>
-                        </td>
-                        <td className="td text-right">
-                          <div className={`font-mono font-bold text-sm ${gainLoss >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                            {gainLoss >= 0 ? '+' : '-'}${Math.abs(gainLoss).toFixed(2)}
-                          </div>
-                          <div className={`text-xs font-mono ${gainPct >= 0 ? 'text-emerald-400/70' : 'text-red-400/70'}`}>
-                            {gainPct >= 0 ? '+' : ''}{gainPct.toFixed(2)}%
-                          </div>
-                        </td>
-                        <td className="td text-right hidden md:table-cell">
+                        <td className="td text-right num whitespace-nowrap" style={{ color:'var(--text-2)' }}>{h.shares}</td>
+                        <td className="td text-right num whitespace-nowrap" style={{ color:'var(--text-2)' }}>${h.avgCost.toFixed(2)}</td>
+                        <td className="td text-right num whitespace-nowrap font-semibold">${h.currentPrice.toFixed(2)}</td>
+                        <td className="td text-right num whitespace-nowrap font-semibold">${money(value)}</td>
+                        <td className="td text-right num whitespace-nowrap" style={{ color: tone(gainLoss) }}>{signedMoney(gainLoss)}</td>
+                        <td className="td text-right num whitespace-nowrap font-semibold" style={{ color: tone(gainPct) }}>{signedPct(gainPct)}</td>
+                        <td className="td text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
-                            <div className="w-14 h-1.5 rounded-full overflow-hidden" style={{ background:'var(--bg-3)' }}>
-                              <div className="h-1.5 rounded-full" style={{ width:`${Math.min(alloc, 100)}%`, background:'var(--accent)' }}/>
+                            <div className="w-12 h-1 rounded-full overflow-hidden" style={{ background:'var(--bg-3)' }}>
+                              <div className="h-1 rounded-full" style={{ width:`${Math.min(alloc, 100)}%`, background:'var(--text-3)' }}/>
                             </div>
-                            <span className="font-mono text-xs w-8 text-right" style={{ color:'var(--text-3)' }}>{alloc.toFixed(1)}%</span>
+                            <span className="num text-xs w-10 text-right" style={{ color:'var(--text-2)' }}>{alloc.toFixed(1)}%</span>
                           </div>
                         </td>
                         <td className="td text-right">
                           <button onClick={() => removeHolding(h.symbol)} aria-label={`Remove ${h.symbol}`}
-                            className="w-7 h-7 rounded-md flex items-center justify-center ml-auto transition-colors hover:bg-red-400/10"
+                            className="w-7 h-7 rounded-full inline-flex items-center justify-center transition-colors hover:bg-[var(--bg-3)]"
                             style={{ color:'var(--text-3)' }}>
-                            <X size={12}/>
+                            <X size={13}/>
                           </button>
                         </td>
-                      </motion.tr>
+                      </tr>
                     )
                   })}
                 </tbody>
+                <tfoot>
+                  <tr>
+                    <td className="td text-xs" style={{ color:'var(--text-3)' }}>
+                      {holdings.length} position{holdings.length !== 1 ? 's' : ''}
+                    </td>
+                    <td colSpan={3} className="td text-right text-xs" style={{ color:'var(--text-3)' }}>Total</td>
+                    <td className="td text-right num font-bold whitespace-nowrap">${money(totalValue)}</td>
+                    <td className="td text-right num font-bold whitespace-nowrap" style={{ color: tone(totalGain) }}>{signedMoney(totalGain)}</td>
+                    <td className="td text-right num font-bold whitespace-nowrap" style={{ color: tone(totalGainPct) }}>{signedPct(totalGainPct)}</td>
+                    <td colSpan={2}/>
+                  </tr>
+                </tfoot>
               </table>
             </div>
-            <div className="px-5 py-3.5 flex items-center justify-between"
-              style={{ background:'var(--bg-2)', borderTop:`1px solid var(--border)` }}>
-              <span className="text-xs" style={{ color:'var(--text-3)' }}>{holdings.length} position{holdings.length !== 1 ? 's' : ''}</span>
-              <div className="flex items-center gap-4">
-                <span className="text-xs" style={{ color:'var(--text-3)' }}>Total</span>
-                <span className="font-black font-mono text-sm" style={{ color:'var(--text-1)' }}>
-                  ${totalValue.toLocaleString('en-US', { minimumFractionDigits:2 })}
-                </span>
-                <span className={`font-black font-mono text-sm ${totalGainPct >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {totalGainPct >= 0 ? '+' : ''}{totalGainPct.toFixed(2)}%
-                </span>
-              </div>
-            </div>
+            <p className="text-xs mt-3" style={{ color:'var(--text-3)' }}>
+              Last price is live where a quote is available; otherwise it is the price saved when the position was added.
+            </p>
+          </section>
+
+          {/* ── Performance + allocation ── */}
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-x-10 gap-y-10">
+            <section aria-label="Sector allocation">
+              <h2 className="section-title mb-3">Allocation</h2>
+              <ResponsiveContainer width="100%" height={140}>
+                <RPie>
+                  <Pie data={sectorData} cx="50%" cy="50%" innerRadius={42} outerRadius={62} paddingAngle={2} dataKey="value" stroke="none">
+                    {sectorData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]}/>)}
+                  </Pie>
+                  <Tooltip formatter={v => [`${v}%`, 'Allocation']}
+                    contentStyle={{ background:'var(--bg-2)', border:'1px solid var(--border)', borderRadius:8, fontSize:11 }}/>
+                </RPie>
+              </ResponsiveContainer>
+              <ul className="mt-2">
+                {sectorData.map((s, i) => (
+                  <li key={s.name} className="flex items-center justify-between text-sm py-2 border-t" style={{ borderColor:'var(--border)' }}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background:COLORS[i % COLORS.length] }}/>
+                      <span className="truncate" style={{ color:'var(--text-2)' }}>{s.name}</span>
+                    </div>
+                    <span className="num font-semibold" style={{ color:'var(--text-1)' }}>{s.value}%</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
           </div>
         </>
       )}

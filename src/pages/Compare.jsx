@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, X, GitCompare, Brain, Plus } from 'lucide-react'
+import { Search, X, GitCompare, Brain } from 'lucide-react'
 import { stocks as baseStocks } from '../data/mockData'
 import { generateAIAnalysis, generateComparisonSummary } from '../utils/aiAnalysis'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
@@ -11,13 +11,13 @@ import PageHeader from '../components/PageHeader'
 /* ── Verdict badge ─────────────────────────────────────────── */
 const VerdictBadge = ({ verdict }) => {
   const cfg = {
-    Bullish: { color:'rgb(var(--up))',      bg:'rgb(var(--up) / .1)',      border:'rgb(var(--up) / .2)' },
-    Bearish: { color:'rgb(var(--down))',    bg:'rgb(var(--down) / .1)',    border:'rgb(var(--down) / .2)' },
-    Neutral: { color:'rgb(var(--caution))', bg:'rgb(var(--caution) / .1)', border:'rgb(var(--caution) / .2)' },
-  }[verdict] || {}
+    Bullish: { color:'rgb(var(--up))',      bg:'rgb(var(--up) / .1)' },
+    Bearish: { color:'rgb(var(--down))',    bg:'rgb(var(--down) / .1)' },
+    Neutral: { color:'rgb(var(--caution))', bg:'rgb(var(--caution) / .1)' },
+  }[verdict] || { color:'var(--text-2)', bg:'var(--bg-3)' }
   return (
-    <span className="text-xs font-bold px-2.5 py-1 rounded-md"
-      style={{ color:cfg.color, background:cfg.bg, border:`1px solid ${cfg.border}` }}>
+    <span className="inline-block text-[11px] font-bold px-2 py-0.5 rounded"
+      style={{ color:cfg.color, background:cfg.bg }}>
       {verdict}
     </span>
   )
@@ -73,12 +73,8 @@ function StockSearch({ onAdd, existing }) {
                 onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-3)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded-md flex items-center justify-center text-xs font-black shrink-0"
-                    style={{ background:`rgba(var(--accent-rgb),.1)`, color:'var(--accent)' }}>
-                    {s.symbol.charAt(0)}
-                  </div>
                   <div>
-                    <div className="text-sm font-bold" style={{ color:'var(--text-1)' }}>{s.symbol}</div>
+                    <div className="text-sm font-bold link">{s.symbol}</div>
                     <div className="text-xs truncate max-w-[160px]" style={{ color:'var(--text-3)' }}>{s.name}</div>
                   </div>
                 </div>
@@ -101,16 +97,13 @@ function StockSearch({ onAdd, existing }) {
 
 /* ── Metric row ────────────────────────────────────────────── */
 const MetricRow = ({ label, values, highlight }) => (
-  <tr className="border-b" style={{ borderColor:'var(--border)' }}>
-    <td className="px-4 py-3 text-xs font-medium" style={{ color:'var(--text-3)', width:'140px' }}>{label}</td>
+  <tr className="border-t" style={{ borderColor:'var(--border)' }}>
+    <th scope="row" className="px-4 py-3 text-left text-[13px] font-medium whitespace-nowrap" style={{ color:'var(--text-3)', width:'160px' }}>{label}</th>
     {values.map((v, i) => (
-      <td key={i} className="px-4 py-3 text-sm font-mono font-semibold text-center"
+      <td key={i} className="px-4 py-3 text-sm num font-bold text-right whitespace-nowrap"
         style={{ color: highlight && highlight[i] ? highlight[i] : 'var(--text-1)' }}>
         {v ?? '—'}
       </td>
-    ))}
-    {values.length < 3 && Array.from({ length: 3 - values.length }).map((_, i) => (
-      <td key={`empty-${i}`} className="px-4 py-3 text-sm text-center" style={{ color:'var(--text-3)' }}>—</td>
     ))}
   </tr>
 )
@@ -168,25 +161,26 @@ export default function Compare() {
 
   const metricRows = buildMetrics(selectedStocks)
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6 page-enter">
 
-      {/* Header */}
+  return (
+    <div className="max-w-[1320px] mx-auto px-4 sm:px-6 py-6 space-y-6 page-enter">
+
+      {/* ── Header ── */}
       <PageHeader title="Compare" subtitle="Put up to three stocks side by side on price, valuation and the AI read." />
 
-      {/* Search + selected chips */}
-      <div className="card-flat">
+      {/* ── Search + selected tickers ── */}
+      <div className="max-w-xl">
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           {selectedStocks.map(s => (
-            <div key={s.symbol}
-              className="flex items-center gap-2 text-sm font-bold font-mono px-3 py-1.5 rounded-md border"
-              style={{ background:'rgba(var(--accent-rgb),.12)', borderColor:'rgba(var(--accent-rgb),.25)', color:'var(--text-1)' }}>
+            <span key={s.symbol}
+              className="inline-flex items-center gap-1.5 text-sm font-bold pl-3 pr-1.5 py-1 rounded-full border"
+              style={{ background:'var(--bg-3)', borderColor:'var(--border)', color:'var(--text-1)' }}>
               {s.symbol}
               <button onClick={() => removeStock(s.symbol)} aria-label={`Remove ${s.symbol}`}
-                className="ml-0.5 hover:opacity-70 transition-opacity">
+                className="w-5 h-5 inline-flex items-center justify-center rounded-full hover:bg-[var(--border)] transition-colors">
                 <X size={12}/>
               </button>
-            </div>
+            </span>
           ))}
           {selectedStocks.length < 3 && (
             <span className="text-xs" style={{ color:'var(--text-3)' }}>
@@ -199,66 +193,40 @@ export default function Compare() {
         )}
       </div>
 
-      {/* Empty state */}
+      {/* ── Empty state ── */}
       {selectedStocks.length === 0 && (
-        <motion.div
-          initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
-          className="card-flat text-center py-16">
-          <GitCompare size={32} className="mx-auto mb-4 opacity-30" style={{ color:'var(--text-3)' }}/>
+        <div className="border-y py-14 text-center" style={{ borderColor:'var(--border)' }}>
+          <GitCompare size={28} className="mx-auto mb-3 opacity-40" style={{ color:'var(--text-3)' }}/>
           <p className="text-sm font-semibold" style={{ color:'var(--text-2)' }}>No stocks selected</p>
           <p className="text-xs mt-1" style={{ color:'var(--text-3)' }}>Search a ticker or company above to add your first stock.</p>
-        </motion.div>
+        </div>
       )}
 
-      {/* Comparison table */}
+      {/* ── Comparison table ── */}
       {selectedStocks.length >= 2 && (
-        <motion.div initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
-          className="rounded-xl overflow-hidden border" style={{ borderColor:'var(--border)' }}>
-
-          {/* Table head — stock names */}
-          <div className="overflow-x-auto">
-            <table className="w-full">
+        <section aria-label="Comparison">
+          <div className="overflow-x-auto rounded-[10px] border" style={{ borderColor:'var(--border)', background:'var(--bg-2)' }}>
+            <table className="w-full min-w-[480px] border-collapse">
               <thead>
-                <tr style={{ background:'var(--bg-2)', borderBottom:'1px solid var(--border)' }}>
-                  <th className="px-4 py-4 text-left text-xs font-medium uppercase tracking-wider"
-                    style={{ color:'var(--text-3)', width:'140px' }}>Metric</th>
+                <tr>
+                  <th scope="col" className="px-4 py-4 text-left text-xs font-semibold" style={{ color:'var(--text-3)', width:'160px' }}>Metric</th>
                   {selectedStocks.map(s => (
-                    <th key={s.symbol} className="px-4 py-4 text-center">
-                      <div className="flex flex-col items-center gap-1">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-black mx-auto"
-                          style={{ background:'rgba(var(--accent-rgb),.12)', color:'var(--accent)' }}>
-                          {s.symbol.charAt(0)}
-                        </div>
-                        <div className="text-sm font-black" style={{ color:'var(--text-1)' }}>{s.symbol}</div>
-                        <div className="text-xs truncate max-w-[120px]" style={{ color:'var(--text-3)' }}>{s.name}</div>
-                      </div>
+                    <th key={s.symbol} scope="col" className="px-4 py-4 text-right font-normal">
+                      <Link to={`/stock/${s.symbol}`} className="text-[15px] font-bold link">{s.symbol}</Link>
+                      <div className="text-xs truncate max-w-[160px] ml-auto" style={{ color:'var(--text-3)' }}>{s.name}</div>
                     </th>
                   ))}
-                  {selectedStocks.length < 3 && (
-                    <th className="px-4 py-4 text-center">
-                      <div className="flex flex-col items-center gap-1 opacity-30">
-                        <div className="w-9 h-9 rounded-lg flex items-center justify-center border border-dashed mx-auto"
-                          style={{ borderColor:'var(--border)' }}>
-                          <Plus size={14} style={{ color:'var(--text-3)' }}/>
-                        </div>
-                        <div className="text-xs" style={{ color:'var(--text-3)' }}>Add stock</div>
-                      </div>
-                    </th>
-                  )}
                 </tr>
               </thead>
-              <tbody style={{ background:'var(--bg-1)' }}>
+              <tbody>
                 {metricRows.map((row, i) => (
                   row.badges ? (
-                    <tr key={i} className="border-b" style={{ borderColor:'var(--border)' }}>
-                      <td className="px-4 py-3 text-xs font-medium" style={{ color:'var(--text-3)' }}>{row.label}</td>
+                    <tr key={i} className="border-t" style={{ borderColor:'var(--border)' }}>
+                      <th scope="row" className="px-4 py-3 text-left text-[13px] font-medium whitespace-nowrap" style={{ color:'var(--text-3)' }}>{row.label}</th>
                       {row.badges.map((verdict, j) => (
-                        <td key={j} className="px-4 py-3 text-center">
+                        <td key={j} className="px-4 py-3 text-right">
                           <VerdictBadge verdict={verdict}/>
                         </td>
-                      ))}
-                      {row.badges.length < 3 && Array.from({ length: 3 - row.badges.length }).map((_, j) => (
-                        <td key={`empty-${j}`} className="px-4 py-3 text-sm text-center" style={{ color:'var(--text-3)' }}>—</td>
                       ))}
                     </tr>
                   ) : (
@@ -268,55 +236,46 @@ export default function Compare() {
               </tbody>
             </table>
           </div>
-        </motion.div>
+        </section>
       )}
 
-      {/* Individual AI cards */}
+      {/* ── Individual AI reads ── */}
       {analyses.length >= 1 && (
         <div className={`grid gap-4 ${analyses.length === 1 ? '' : analyses.length === 2 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-3'}`}>
           {analyses.map(({ symbol, name, ai }) => {
             if (!ai) return null
             return (
-              <motion.div key={symbol}
-                initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
-                className="card-flat space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Link to={`/stock/${symbol}`}
-                      className="text-sm font-black hover:text-accent transition-colors"
-                      style={{ color:'var(--text-1)' }}>
-                      {symbol}
-                    </Link>
+              <div key={symbol} className="card-flat space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <Link to={`/stock/${symbol}`} className="text-[15px] font-bold link">{symbol}</Link>
                     <p className="text-xs truncate" style={{ color:'var(--text-3)' }}>{name}</p>
                   </div>
                   <VerdictBadge verdict={ai.verdict}/>
                 </div>
-                <div className="rounded-lg p-3 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
-                  <p className="text-xs leading-relaxed" style={{ color:'var(--text-2)' }}>{ai.summary}</p>
+                <p className="text-[13px] leading-relaxed" style={{ color:'var(--text-2)' }}>{ai.summary}</p>
+                <div className="border-t pt-3" style={{ borderColor:'var(--border)' }}>
+                  <div className="section-label mb-1.5">Technical</div>
+                  <p className="text-[13px] leading-relaxed" style={{ color:'var(--text-2)' }}>{ai.techSummary}</p>
                 </div>
-                <div className="rounded-lg p-3 border" style={{ background:'var(--bg-1)', borderColor:'var(--border)' }}>
-                  <div className="text-xs font-bold uppercase tracking-wider mb-1.5" style={{ color:'var(--text-3)' }}>Technical</div>
-                  <p className="text-xs leading-relaxed" style={{ color:'var(--text-2)' }}>{ai.techSummary}</p>
-                </div>
-              </motion.div>
+              </div>
             )
           })}
         </div>
       )}
 
-      {/* AI comparison summary */}
+      {/* ── Comparison summary ── */}
       {compSummary && (
-        <motion.div initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}
-          className="card-flat">
-          <div className="flex items-center gap-2 mb-3">
-            <Brain size={14} style={{ color:'var(--accent)' }}/>
-            <span className="text-sm font-bold" style={{ color:'var(--text-1)' }}>AI Comparison Summary</span>
+        <div className="card-flat" style={{ background:'var(--bg-1)' }}>
+          <div className="flex items-center gap-2 mb-2">
+            <Brain size={14} style={{ color:'var(--text-2)' }}/>
+            <h2 className="section-title">AI comparison summary</h2>
           </div>
           <p className="text-sm leading-relaxed" style={{ color:'var(--text-2)' }}>{compSummary}</p>
           <p className="text-xs mt-3" style={{ color:'var(--text-3)' }}>
             For informational purposes only. Not financial advice.
           </p>
-        </motion.div>
+        </div>
       )}
 
     </div>

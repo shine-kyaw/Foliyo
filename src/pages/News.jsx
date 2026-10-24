@@ -1,14 +1,79 @@
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Newspaper, TrendingUp, TrendingDown, Search, ExternalLink, Minus, Loader2 } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Search, Loader2 } from 'lucide-react'
 import { useMarketNews } from '../hooks/useMarketNews'
 import PageHeader, { StatusPill } from '../components/PageHeader'
 
-const CATEGORIES = ['All','Macro','Earnings','Corporate','Regulatory','Commodities','Crypto']
+const CATEGORIES = ['All','Macro','Earnings','Corporate','Regulatory','Commodities','Crypto','Technology']
 
-/* Articles open at their source in a new tab; sample items without a URL stay put */
+/* Articles open at their source in a new tab; items without a URL stay put */
 const hasUrl = url => !!url && url !== '#'
 const articleLink = url => hasUrl(url) ? { href:url, target:'_blank', rel:'noopener noreferrer' } : {}
+
+const ago = ms => {
+  if (!ms) return ''
+  const m = Math.max(1, Math.round((Date.now() - ms) / 60_000))
+  if (m < 60) return `${m}m ago`
+  const h = Math.round(m / 60)
+  return h < 24 ? `${h}h ago` : `${Math.round(h / 24)}d ago`
+}
+const when = a => ago(a.datetime) || a.time
+
+/* ── Stories — same look as the home page ──────────────────── */
+function LeadStory({ a }) {
+  return (
+    <a {...articleLink(a.url)} className={`group grid gap-5 items-start ${a.image ? 'sm:grid-cols-[1.1fr_1fr]' : ''}`}>
+      {a.image && (
+        <div className="aspect-[16/10] rounded-xl overflow-hidden" style={{ background:'var(--bg-3)' }}>
+          <img src={a.image} alt="" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+            onError={e => { e.currentTarget.parentElement.style.display = 'none' }} />
+        </div>
+      )}
+      <div>
+        <div className="section-label mb-2">{a.category}</div>
+        <h2 className="text-[1.9rem] sm:text-[2.3rem] font-bold leading-[1.08] group-hover:underline decoration-2 underline-offset-4"
+          style={{ color:'var(--text-1)' }}>{a.title}</h2>
+        {a.summary && a.summary !== a.title && (
+          <p className="mt-3 text-[15px] leading-relaxed line-clamp-4" style={{ color:'var(--text-2)' }}>{a.summary}</p>
+        )}
+        <div className="mt-3 text-xs" style={{ color:'var(--text-3)' }}>{a.source} · {when(a)}</div>
+      </div>
+    </a>
+  )
+}
+
+function StoryCard({ a }) {
+  return (
+    <a {...articleLink(a.url)} className="group block">
+      {a.image && (
+        <div className="aspect-[16/9] rounded-lg overflow-hidden mb-2.5" style={{ background:'var(--bg-3)' }}>
+          <img src={a.image} alt="" loading="lazy" className="w-full h-full object-cover"
+            onError={e => { e.currentTarget.parentElement.style.display = 'none' }} />
+        </div>
+      )}
+      <h3 className="text-[15px] font-semibold leading-snug line-clamp-3 group-hover:underline" style={{ color:'var(--text-1)' }}>{a.title}</h3>
+      <div className="mt-1.5 text-xs" style={{ color:'var(--text-3)' }}>{a.source} · {when(a)}</div>
+    </a>
+  )
+}
+
+function StoryRow({ a }) {
+  return (
+    <a {...articleLink(a.url)} className="group flex gap-4 py-3.5 border-t" style={{ borderColor:'var(--border)' }}>
+      <div className="flex-1 min-w-0">
+        <h3 className="text-[15px] font-semibold leading-snug group-hover:underline" style={{ color:'var(--text-1)' }}>{a.title}</h3>
+        {a.summary && a.summary !== a.title && (
+          <p className="mt-1 text-[13px] leading-snug line-clamp-2 hidden sm:block" style={{ color:'var(--text-2)' }}>{a.summary}</p>
+        )}
+        <div className="mt-1 text-xs" style={{ color:'var(--text-3)' }}>{a.source} · {when(a)}</div>
+      </div>
+      {a.image && (
+        <div className="w-28 h-[72px] rounded-md overflow-hidden shrink-0" style={{ background:'var(--bg-3)' }}>
+          <img src={a.image} alt="" loading="lazy" className="w-full h-full object-cover" onError={e => { e.currentTarget.parentElement.style.display = 'none' }}/>
+        </div>
+      )}
+    </a>
+  )
+}
 
 export default function News() {
   const [category, setCategory] = useState('All')
@@ -16,139 +81,80 @@ export default function News() {
 
   const { articles: newsArticles, isLive, loading } = useMarketNews()
 
-  const filtered = newsArticles.filter(n =>
-    (category === 'All' || n.category === category) &&
-    (n.title.toLowerCase().includes(search.toLowerCase()) || n.source.toLowerCase().includes(search.toLowerCase()))
-  )
+  const q = search.toLowerCase()
+  const filtered = useMemo(() => {
+    const list = newsArticles.filter(n =>
+      (category === 'All' || n.category === category) &&
+      (n.title.toLowerCase().includes(q) || n.source.toLowerCase().includes(q))
+    )
+    // stories with a picture lead, as on the home page
+    return [...list.filter(a => a.image), ...list.filter(a => !a.image)]
+  }, [newsArticles, category, q])
 
-  const SentimentIcon = ({ s }) => s === 'bullish'
-    ? <TrendingUp size={11} className="text-emerald-400"/>
-    : s === 'bearish' ? <TrendingDown size={11} className="text-red-400"/> : <Minus size={11} style={{ color:'var(--text-3)' }}/>
+  // Only offer categories that actually have stories right now
+  const tabs = CATEGORIES.filter(c => c === 'All' || c === category || newsArticles.some(n => n.category === c))
+
+  const [lead, ...more] = filtered
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6 page-enter">
-      {/* Header */}
-      <PageHeader title="News" subtitle="Market headlines, each tagged bullish, bearish or neutral.">
+    <div className="max-w-[1320px] mx-auto px-4 sm:px-6 py-6 page-enter">
+      {/* ── Header ── */}
+      <PageHeader title="News" subtitle="Market headlines from across the wires, newest first." className="mb-5">
         {loading
           ? <Loader2 size={14} className="animate-spin" aria-label="Loading news" style={{ color:'var(--text-3)' }}/>
-          : isLive
-            ? <StatusPill tone="live" pulse>Live</StatusPill>
-            : <StatusPill tone="muted">Sample articles</StatusPill>}
+          : isLive && <StatusPill tone="live" pulse>Live</StatusPill>}
         <div className="relative">
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color:'var(--text-3)' }}/>
-          <input aria-label="Search news" className="input pl-9 w-52 text-sm" placeholder="Search headlines or sources" value={search} onChange={e=>setSearch(e.target.value)}/>
+          <input aria-label="Search news" className="input pl-9 w-full sm:w-64 text-sm" placeholder="Search headlines or sources" value={search} onChange={e=>setSearch(e.target.value)}/>
         </div>
       </PageHeader>
 
-      {/* Sentiment Summary */}
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { label:'Bullish stories', count: newsArticles.filter(n=>n.sentiment==='bullish').length, color:'text-emerald-400', bg:'rgb(var(--up) / .08)',   border:'rgb(var(--up) / .2)' },
-          { label:'Bearish stories', count: newsArticles.filter(n=>n.sentiment==='bearish').length, color:'text-red-400',     bg:'rgb(var(--down) / .08)', border:'rgb(var(--down) / .2)' },
-          { label:'Neutral / watch', count: newsArticles.filter(n=>n.sentiment==='neutral').length,  color:'',                bg:'var(--bg-2)',            border:'var(--border)' },
-        ].map(s => (
-          <div key={s.label} className="rounded-xl px-4 py-3.5 border flex items-center gap-3"
-            style={{ background:s.bg, borderColor:s.border }}>
-            <span className={`text-3xl font-black font-mono ${s.color}`} style={s.color ? undefined : { color:'var(--text-2)' }}>{s.count}</span>
-            <span className="text-xs font-semibold" style={{ color:'var(--text-2)' }}>{s.label}</span>
-          </div>
+      {/* ── Category tabs ── */}
+      <div role="tablist" aria-label="News categories" className="flex gap-6 overflow-x-auto border-b mb-6" style={{ borderColor:'var(--border)' }}>
+        {tabs.map(c => (
+          <button key={c} role="tab" aria-selected={category === c} onClick={() => setCategory(c)}
+            className="shrink-0 whitespace-nowrap py-3 text-sm -mb-px border-b-[3px] transition-colors"
+            style={category === c
+              ? { color:'var(--text-1)', fontWeight:700, borderColor:'var(--brand)' }
+              : { color:'var(--text-2)', fontWeight:500, borderColor:'transparent' }}>
+            {c}
+          </button>
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-2 flex-wrap">
-        {CATEGORIES.map(c => (
-          <button key={c} onClick={()=>setCategory(c)}
-            className="text-xs px-3.5 py-2 rounded-md font-semibold border transition-colors"
-            style={category===c
-              ? { background:'rgba(var(--accent-rgb),.12)', color:'var(--text-1)', borderColor:'rgba(var(--accent-rgb),.25)' }
-              : { background:'transparent', borderColor:'transparent', color:'var(--text-2)' }
-            }>{c}</button>
-        ))}
-      </div>
-
-      {/* Featured */}
-      {category === 'All' && !search && newsArticles.length > 0 && (
-        <motion.div initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }}
-          className="rounded-xl overflow-hidden border"
-          style={{ background:'var(--bg-2)', borderColor:'rgba(var(--accent-rgb),.25)' }}>
-          <div className="p-6">
-            <div className="flex items-center gap-3 mb-3 flex-wrap">
-              <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-md ${newsArticles[0].sentiment==='bullish'?'bg-emerald-400/10 text-emerald-400':newsArticles[0].sentiment==='bearish'?'bg-red-400/10 text-red-400':''}`}
-                style={newsArticles[0].sentiment==='bullish'||newsArticles[0].sentiment==='bearish' ? undefined : { background:'var(--bg-3)', color:'var(--text-2)' }}>
-                <SentimentIcon s={newsArticles[0].sentiment}/> {newsArticles[0].sentiment || 'neutral'}
-              </span>
-              <span className="badge-accent text-xs">{newsArticles[0].category}</span>
-              <span className="text-xs ml-auto" style={{ color:'var(--text-3)' }}>{newsArticles[0].source} · {newsArticles[0].time}</span>
-            </div>
-            <h2 className="text-xl font-black mb-2 leading-snug" style={{ color:'var(--text-1)' }}>{newsArticles[0].title}</h2>
-            <p className="text-sm leading-relaxed mb-4" style={{ color:'var(--text-2)' }}>{newsArticles[0].summary}</p>
-            <div className="flex items-center gap-3 flex-wrap">
-              {newsArticles[0].relatedSymbols?.map(s => (
-                <span key={s} className="text-xs px-2 py-1 rounded-md font-mono" style={{ background:'var(--bg-3)', color:'var(--text-2)' }}>{s}</span>
-              ))}
-              {hasUrl(newsArticles[0].url) && (
-                <a {...articleLink(newsArticles[0].url)}
-                  className="ml-auto flex items-center gap-1.5 text-xs font-semibold hover:text-accent transition-colors" style={{ color:'var(--text-2)' }}>
-                  Read full article <ExternalLink size={11}/>
-                </a>
-              )}
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Grid */}
+      {/* ── Stories ── */}
       {loading && (
-        <div className="flex items-center justify-center py-16" style={{ color:'var(--text-3)' }}>
-          <Loader2 size={24} className="animate-spin mr-3"/>
-          <span className="text-sm">Loading news</span>
+        <div className="space-y-4" aria-hidden="true">
+          <div className="h-64 rounded-xl shimmer"/>
+          <div className="grid sm:grid-cols-3 gap-5"><div className="h-36 rounded-lg shimmer"/><div className="h-36 rounded-lg shimmer"/><div className="h-36 rounded-lg shimmer"/></div>
         </div>
       )}
-      <AnimatePresence mode="wait">
-        <motion.div key={category+search} initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((article, i) => (
-            <motion.a key={article.id}
-              {...articleLink(article.url)}
-              initial={{ opacity:0, y:20 }} animate={{ opacity:1, y:0 }} transition={{ delay: i*0.07 }}
-              className={`card flex flex-col group ${hasUrl(article.url) ? 'cursor-pointer' : ''}`}>
-              <div className="flex gap-2 flex-wrap mb-3">
-                <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-md ${article.sentiment==='bullish'?'bg-emerald-400/10 text-emerald-400':article.sentiment==='bearish'?'bg-red-400/10 text-red-400':''}`}
-                  style={article.sentiment==='bullish'||article.sentiment==='bearish' ? undefined : { background:'var(--bg-3)', color:'var(--text-2)' }}>
-                  <SentimentIcon s={article.sentiment}/> {article.sentiment || 'neutral'}
-                </span>
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-md" style={{ background:'var(--bg-3)', color:'var(--text-2)' }}>{article.category}</span>
-              </div>
-              <div className="flex-1 flex flex-col">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs font-semibold" style={{ color:'var(--text-3)' }}>{article.source}</span>
-                  <span style={{ color:'var(--border)' }}>·</span>
-                  <span className="text-xs" style={{ color:'var(--text-3)' }}>{article.time}</span>
-                </div>
-                <h3 className="text-sm font-bold leading-snug mb-2 flex-1 group-hover:text-accent transition-colors" style={{ color:'var(--text-1)' }}>
-                  {article.title}
-                </h3>
-                <p className="text-xs leading-relaxed line-clamp-2 mb-3" style={{ color:'var(--text-3)' }}>{article.summary}</p>
-                <div className="flex items-center justify-between mt-auto">
-                  <div className="flex gap-1.5 flex-wrap">
-                    {article.relatedSymbols?.slice(0,3).map(s => (
-                      <span key={s} className="text-xs px-1.5 py-0.5 rounded font-mono" style={{ background:'var(--bg-3)', color:'var(--text-3)' }}>{s}</span>
-                    ))}
-                  </div>
-                  {hasUrl(article.url) && <ExternalLink size={12} className="group-hover:text-accent transition-colors" style={{ color:'var(--text-3)' }}/>}
-                </div>
-              </div>
-            </motion.a>
-          ))}
-        </motion.div>
-      </AnimatePresence>
 
-      {!loading && !filtered.length && (
-        <div className="text-center py-20" style={{ color:'var(--text-3)' }}>
-          <Newspaper size={32} className="mx-auto mb-3 opacity-30"/>
-          <p className="text-sm">No articles match. Clear the search or choose another category.</p>
+      {!loading && lead && (
+        <div>
+          <LeadStory a={lead} />
+          {more.length > 0 && (
+            <div className="grid sm:grid-cols-3 gap-5 mt-8">
+              {more.slice(0, 3).map(a => <StoryCard key={a.id} a={a} />)}
+            </div>
+          )}
+          {more.length > 3 && (
+            <div className="mt-6">
+              {more.slice(3).map(a => <StoryRow key={a.id} a={a} />)}
+            </div>
+          )}
+          <p className="text-xs mt-6" style={{ color:'var(--text-3)' }}>
+            {filtered.length} {filtered.length === 1 ? 'story' : 'stories'}{category !== 'All' ? ` in ${category}` : ''}{search ? ` matching “${search}”` : ''}. Headlines link to the publisher’s site.
+          </p>
         </div>
+      )}
+
+      {!loading && !lead && (
+        <p className="text-sm py-12 text-center" style={{ color:'var(--text-3)' }}>
+          {newsArticles.length
+            ? 'No stories match. Clear the search or choose another category.'
+            : 'Headlines aren’t loading right now. Try refreshing in a minute.'}
+        </p>
       )}
     </div>
   )

@@ -26,7 +26,8 @@ const SECTOR_RISK = {
 }
 
 export function generateAIAnalysis(stock) {
-  if (!stock) return null
+  // No verdict without a live price and move — the rules need both
+  if (!stock || !Number.isFinite(stock.price) || !Number.isFinite(stock.changePct)) return null
   const { name = '', symbol = '', price = 0, changePct = 0, pe, mktCap, sector = '' } = stock
 
   /* ── Score ─────────────────────────────────────────────────── */

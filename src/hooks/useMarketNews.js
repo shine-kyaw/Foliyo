@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { api } from '../services/api'
-import { newsArticles } from '../data/mockData'
 
 /**
  * Fetches general market news via the backend (Finnhub).
@@ -17,10 +16,10 @@ export function useMarketNews() {
       try {
         const result = await api.marketNews()
         if (cancelled) return
-        const arts = result.articles?.length ? result.articles : newsArticles
+        const arts = result.articles || []
         setArticles(arts); setIsLive(result.isLive ?? false)
       } catch {
-        if (!cancelled) { setArticles(newsArticles); setIsLive(false) }
+        if (!cancelled) { setArticles([]); setIsLive(false) }
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -51,13 +50,11 @@ export function useCompanyNews(symbol) {
         if (result.articles?.length) {
           setArticles(result.articles); setIsLive(true)
         } else {
-          const mock = newsArticles.filter(n => n.relatedSymbols?.includes(symbol))
-          setArticles(mock); setIsLive(false)
+          setArticles([]); setIsLive(false)
         }
       } catch {
         if (!cancelled) {
-          const mock = newsArticles.filter(n => n.relatedSymbols?.includes(symbol))
-          setArticles(mock); setIsLive(false)
+          setArticles([]); setIsLive(false)
         }
       } finally {
         if (!cancelled) setLoading(false)

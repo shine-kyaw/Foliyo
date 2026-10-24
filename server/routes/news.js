@@ -27,6 +27,8 @@ function normalize(item, i) {
     source: item.source || 'Market News',
     time: fmtAge((item.datetime || 0) * 1000),
     url: item.url || '#',
+    image: item.image && /^https:\/\//.test(item.image) ? item.image : null,
+    datetime: item.datetime ? item.datetime * 1000 : null,
     category: mapCat(item.category),
     sentiment: 'neutral',
     relatedSymbols: item.related ? [item.related] : [],
