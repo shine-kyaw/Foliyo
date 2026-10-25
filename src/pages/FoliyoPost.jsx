@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useParams, Link, Navigate } from 'react-router-dom'
 import { ArrowLeft, ExternalLink, ChevronRight } from 'lucide-react'
-import { foliyoPosts, FACEBOOK_PAGE } from '../data/foliyoPosts'
+import { FACEBOOK_PAGE } from '../data/foliyoPosts'
+import { useFoliyoPosts, postDate } from '../hooks/useFoliyoPosts'
 import { BrandLockup } from '../components/Navbar'
 
 /* A short line with no closing punctuation reads as a section heading */
@@ -39,9 +40,12 @@ export function LangToggle({ lang, setLang }) {
 
 export default function FoliyoPost() {
   const { slug } = useParams()
+  const { articles: foliyoPosts, loading } = useFoliyoPosts()
   const post = foliyoPosts.find(p => p.slug === slug)
   const [lang, setLang] = useState(() => { try { return localStorage.getItem('foliyo_read_lang') || 'en' } catch { return 'en' } })
+  if (!post && loading) return <div className="max-w-[720px] mx-auto px-4 py-16"><div className="h-64 rounded-xl shimmer"/></div>
   if (!post) return <Navigate to="/news?tab=foliyo" replace />
+  const bilingual = !post.langs || post.langs.length > 1
 
   const choose = l => { setLang(l); try { localStorage.setItem('foliyo_read_lang', l) } catch {} }
   const v = post[lang]
@@ -62,9 +66,11 @@ export default function FoliyoPost() {
         <div className="flex flex-wrap items-center justify-between gap-4 mt-5 pb-5 border-b" style={{ borderColor:'var(--border)' }}>
           <div className="flex items-center gap-3">
             <BrandLockup size={20} />
-            <span className="text-xs" style={{ color:'var(--text-3)' }}>Posted on Facebook</span>
+            <span className="text-xs" style={{ color:'var(--text-3)' }}>
+              Posted on Facebook{postDate(post.date) ? ` · ${postDate(post.date)}` : ''}
+            </span>
           </div>
-          <LangToggle lang={lang} setLang={choose} />
+          {bilingual && <LangToggle lang={lang} setLang={choose} />}
         </div>
 
         <div className="mt-7">

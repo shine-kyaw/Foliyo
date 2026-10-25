@@ -11,6 +11,7 @@ import trendingRouter     from './routes/trending.js'
 import ysxRouter          from './routes/ysx.js'
 import accountRouter      from './routes/account.js'
 import alertsRouter       from './routes/alerts.js'
+import foliyoPostsRouter  from './routes/foliyoPosts.js'
 import { dbEnabled, migrate } from './db.js'
 import { authEnabled } from './auth.js'
 import { mailEnabled } from './mailer.js'
@@ -44,6 +45,7 @@ app.use('/api/stocks',       trendingRouter)// /api/stocks/trending, /api/stocks
 app.use('/api/ysx',          ysxRouter)     // real Yangon Stock Exchange history
 app.use('/api/auth',         accountRouter) // sign-in, profile, synced data
 app.use('/api/alerts',       alertsRouter)  // signed-in users' alerts
+app.use('/api/foliyo-posts', foliyoPostsRouter) // Foliyo's Facebook articles (live with FB_PAGE_TOKEN)
 
 // ── Health check ──────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
@@ -56,6 +58,7 @@ app.get('/api/health', (_req, res) => {
       alphaVantage: !!process.env.ALPHA_VANTAGE_API_KEY,
     },
     accounts: { database: dbEnabled, auth: authEnabled, google: !!process.env.GOOGLE_CLIENT_ID, email: mailEnabled },
+    facebookPosts: !!process.env.FB_PAGE_TOKEN,
   })
 })
 

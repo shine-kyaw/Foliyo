@@ -60,6 +60,9 @@ export const api = {
   /** Stock fundamentals: PE, PB, beta, description, etc. */
   fundamentals: (symbol) => apiFetch('/fundamentals', { symbol }),
 
+  /** Foliyo's Facebook articles — live from the page when the API has a token, else the saved copy */
+  foliyoPosts: () => apiFetch('/foliyo-posts'),
+
   /** Market cap / P/E / avg volume for many symbols — cached part now, rest filled in the background */
   fundamentalsBatch: (symbols) => apiFetch('/fundamentals/batch', { symbols }),
 

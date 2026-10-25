@@ -8,7 +8,7 @@ import { useSignals } from '../hooks/useSignals'
 import { useMarketNews } from '../hooks/useMarketNews'
 import { EXCHANGES, sessionState, hoursLabel } from '../utils/exchanges'
 import { fmtPrice, fmtPct } from '../utils/formatLive'
-import { foliyoPosts } from '../data/foliyoPosts'
+import { useFoliyoPosts } from '../hooks/useFoliyoPosts'
 
 /* ── Helpers ────────────────────────────────────────────────── */
 const ago = ms => {
@@ -189,6 +189,7 @@ function TickerRows({ rows }) {
 
 function RightRail() {
   const { signals, loading } = useSignals()
+  const { articles: foliyoPosts } = useFoliyoPosts()
   const [tab, setTab] = useState('gainers')
   const byMove = [...signals].sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct))
   const gainers = [...signals].filter(s => s.changePct > 0).sort((a, b) => b.changePct - a.changePct).slice(0, 5)

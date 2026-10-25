@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Search, Loader2, ChevronRight } from 'lucide-react'
-import { foliyoPosts, FACEBOOK_PAGE } from '../data/foliyoPosts'
+import { FACEBOOK_PAGE } from '../data/foliyoPosts'
+import { useFoliyoPosts, postDate } from '../hooks/useFoliyoPosts'
 import { excerpt, LangToggle } from './FoliyoPost'
 import { useMarketNews } from '../hooks/useMarketNews'
 import PageHeader, { StatusPill } from '../components/PageHeader'
@@ -84,7 +85,7 @@ function FoliyoCard({ p, lang, big }) {
   return (
     <Link to={`/news/foliyo/${p.slug}`} className="group block rounded-xl border p-5 h-full transition-colors hover:border-[var(--border-light)]"
       style={{ borderColor:'var(--border)', background:'var(--bg-2)' }}>
-      <div className="eyebrow mb-3">Foliyo</div>
+      <div className="eyebrow mb-3">Foliyo{postDate(p.date) ? <span className="normal-case tracking-normal font-medium" style={{ color:'var(--text-3)' }}> · {postDate(p.date)}</span> : null}</div>
       <h3 className={`${big ? 'text-[1.6rem]' : 'text-[1.15rem]'} font-bold leading-snug group-hover:underline ${lang === 'my' ? 'lang-my' : 'headline'}`}
         style={{ color:'var(--text-1)' }} lang={lang === 'my' ? 'my' : 'en'}>
         {v.title}
@@ -98,6 +99,7 @@ function FoliyoCard({ p, lang, big }) {
 }
 
 function FoliyoSection({ all, lang, setLang }) {
+  const { articles: foliyoPosts } = useFoliyoPosts()
   const list = all ? foliyoPosts : foliyoPosts.slice(0, 3)
   return (
     <section aria-label="From Foliyo" className="mb-10">
