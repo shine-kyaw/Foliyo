@@ -34,7 +34,7 @@ export function useHoldingsHistory(holdings, range = '6M') {
       for (const h of included) {
         for (const p of series[h.symbol]) {
           const k = p.rawDate || p.date
-          const row = byDate.get(k) || { date: p.date, rawDate: k, value: 0, n: 0 }
+          const row = byDate.get(k) || { date: p.date, rawDate: k, t: p.t ?? Date.parse(p.rawDate), value: 0, n: 0 }
           row.value += h.shares * p.price
           row.n += 1
           byDate.set(k, row)
@@ -43,7 +43,7 @@ export function useHoldingsHistory(holdings, range = '6M') {
       const data = [...byDate.values()]
         .filter(r => r.n === included.length)
         .sort((a, b) => String(a.rawDate).localeCompare(String(b.rawDate)))
-        .map(r => ({ date: r.date, value: Math.round(r.value * 100) / 100 }))
+        .map(r => ({ date: r.date, t: r.t, value: Math.round(r.value * 100) / 100 }))
       setState({ data, loading: false, missing })
     })()
     return () => { cancelled = true }

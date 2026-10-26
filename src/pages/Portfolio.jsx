@@ -5,6 +5,7 @@ import { Plus, Search, X } from 'lucide-react'
 import { stocks } from '../data/mockData'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
 import { useHoldingsHistory } from '../hooks/useHoldingsHistory'
+import PriceChart from '../components/PriceChart'
 import PageHeader from '../components/PageHeader'
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart as RPie, Pie, Cell } from 'recharts'
 import { persist } from '../utils/userStore'
@@ -364,22 +365,8 @@ export default function Portfolio() {
               {historyLoading && !history.length ? (
                 <div className="h-[220px] rounded-lg shimmer" />
               ) : history.length > 1 ? (
-                <ResponsiveContainer width="100%" height={220}>
-                  <AreaChart data={history} margin={{ top:5, right:5, bottom:0, left:5 }}>
-                    <defs>
-                      <linearGradient id="holdGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%"  stopColor={histUp ? 'rgb(var(--up))' : 'rgb(var(--down))'} stopOpacity={0.14}/>
-                        <stop offset="95%" stopColor={histUp ? 'rgb(var(--up))' : 'rgb(var(--down))'} stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid stroke="var(--border)" vertical={false}/>
-                    <XAxis dataKey="date" tick={{ fontSize:11, fill:'var(--text-3)' }} interval={Math.max(0, Math.floor(history.length / 5))} axisLine={false} tickLine={false}/>
-                    <YAxis tick={{ fontSize:11, fill:'var(--text-3)' }} domain={['auto','auto']} axisLine={false} tickLine={false}
-                      tickFormatter={v => v >= 1000 ? `$${(v/1000).toFixed(1)}k` : `$${v.toFixed(0)}`} width={52}/>
-                    <Tooltip content={<ChartTip/>}/>
-                    <Area type="monotone" dataKey="value" stroke={histUp ? 'rgb(var(--up))' : 'rgb(var(--down))'} strokeWidth={1.75} fill="url(#holdGrad)"/>
-                  </AreaChart>
-                </ResponsiveContainer>
+                <PriceChart data={history.map(h => ({ t: h.t, close: h.value }))} height={260} showVolume={false}
+                  tz="America/New_York" ariaLabel="Holdings value" />
               ) : (
                 <p className="h-[120px] flex items-center text-sm" style={{ color:'var(--text-3)' }}>Price history isn’t available right now. Try again in a minute.</p>
               )}

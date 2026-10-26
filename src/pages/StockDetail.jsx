@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, Link, Navigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -12,6 +12,7 @@ import { useChart } from '../hooks/useChart'
 import { useFundamentals } from '../hooks/useFundamentals'
 import { useBatchQuotes } from '../hooks/useBatchQuotes'
 import { StatusPill } from '../components/PageHeader'
+import PriceChart, { rangeChange } from '../components/PriceChart'
 import { api } from '../services/api'
 import { ysxStocks } from '../data/myanmarStocks'
 import {
@@ -20,7 +21,8 @@ import {
 } from 'recharts'
 import { persist } from '../utils/userStore'
 
-const RANGES = ['1D','5D','1M','6M','1Y','5Y','All']
+const RANGES = ['1D','5D','1M','3M','6M','YTD','1Y','5Y','All']
+const RANGE_WORDS = { '1D':'today', '5D':'past 5 days', '1M':'past month', '3M':'past 3 months', '6M':'past 6 months', 'YTD':'year to date', '1Y':'past year', '5Y':'past 5 years', 'All':'all time' }
 const TICK = { fontSize:11, fill:'var(--text-3)', fontFamily:"'Archivo', system-ui, sans-serif" }
 
 /* ── Small helpers ─────────────────────────────────────────── */
@@ -197,13 +199,23 @@ export default function StockDetail() {
     mktCap: fundamentals?.mktCap ?? null,
     price: null,
   }
-  const { data: chartData, loading: chartLoading, isLive: chartLive, source: chartSource, refetch: refetchChart } = useChart(symbol, range, null)   // no stand-in history: an unavailable chart says so
+  const { data: chartData, loading: chartLoading, isLive: chartLive, source: chartSource, timezone: chartTz, refetch: refetchChart } = useChart(symbol, range, null)   // no stand-in history: an unavailable chart says so
 
   /* Show "—" rather than mock prices until live data arrives. */
   const livePrice     = quote?.price     ?? null
   const liveChange    = quote?.change    ?? null
   const liveChangePct = quote?.changePct ?? null
   const hasPrice = livePrice != null
+
+  /* ── Chart series (real bars from the chart API) ── */
+  const [chartMode, setChartMode] = useState('line')
+  const [hoverPt, setHoverPt] = useState(null)
+  const intraday = range === '1D' || range === '5D'
+  const chartPts = useMemo(() => (chartData || []).map(d => ({
+    t: d.t ?? Date.parse(d.rawDate), close: d.price, open: d.open, high: d.high, low: d.low, volume: d.volume,
+  })).filter(d => Number.isFinite(d.t) && Number.isFinite(d.close)), [chartData])
+  const chartPrev = range === '1D' ? quote?.prevClose ?? null : null
+  const rng = rangeChange(chartPts, { intraday: range === '1D', prevClose: chartPrev })
 
   const relatedNews = (liveNews.length ? liveNews : newsArticles.filter(n => n.relatedSymbols?.includes(stock.symbol)))
     .slice(0, 4)
@@ -392,10 +404,14 @@ export default function StockDetail() {
             </div>
 
             <div className="flex items-end gap-x-4 gap-y-1 flex-wrap mt-3">
-              <div className="text-[2.25rem] sm:text-[2.5rem] font-bold num leading-none" style={{ color: hasPrice ? 'var(--text-1)' : 'var(--text-3)' }}>
-                {priceStr}
+              <div className="text-[2.25rem] sm:text-[2.5rem] font-bold num leading-none" style={{ color: hasPrice || hoverPt ? 'var(--text-1)' : 'var(--text-3)' }}>
+                {hoverPt ? `$${hoverPt.close.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 })}` : priceStr}
               </div>
-              {hasPrice && (
+              {hoverPt ? (
+                <div className="text-lg sm:text-xl font-semibold num leading-none pb-0.5" style={{ color: tone(hoverPt.change) }}>
+                  {hoverPt.change >= 0 ? '+' : '−'}{Math.abs(hoverPt.change).toFixed(2)} ({hoverPt.change >= 0 ? '+' : '−'}{Math.abs(hoverPt.changePct).toFixed(2)}%)
+                </div>
+              ) : hasPrice && (
                 <div className="text-lg sm:text-xl font-semibold num leading-none pb-0.5" style={{ color: tone(liveChangePct) }}>
                   {sign}{liveChange.toFixed(2)} ({sign}{liveChangePct.toFixed(2)}%)
                 </div>
@@ -412,7 +428,9 @@ export default function StockDetail() {
                 )}
               </div>
             </div>
-            {statusLine && (
+            {hoverPt ? (
+              <div className="text-xs mt-2 font-medium" style={{ color:'var(--text-2)' }}>{hoverPt.when}</div>
+            ) : statusLine && (
               <div className="flex items-center gap-1.5 text-xs mt-2" style={{ color:'var(--text-3)' }}>
                 {statusLine}
                 <button onClick={refetch} aria-label="Refresh quote" className="opacity-60 hover:opacity-100 transition-opacity">
@@ -450,73 +468,53 @@ export default function StockDetail() {
                   {RANGES.map(r => (
                     <button key={r} onClick={() => setRange(r)} aria-pressed={range === r}
                       className="text-xs num px-3 py-1 rounded-full font-semibold transition-colors"
-                      style={range === r
-                        ? { background:'var(--btn-bg)', color:'var(--btn-fg)' }
-                        : { color:'var(--text-2)', background:'var(--bg-1)' }
-                      }>
+                      style={range === r ? { background:'var(--btn-bg)', color:'var(--btn-fg)' } : { color:'var(--text-2)', background:'var(--bg-1)' }}>
                       {r}
                     </button>
                   ))}
                 </div>
-                <button onClick={refetchChart} className="p-1.5 rounded-md transition-colors hover:text-accent"
-                  style={{ color:'var(--text-3)' }} title="Refresh chart" aria-label="Refresh chart">
-                  <RefreshCw size={12} className={chartLoading ? 'animate-spin' : ''}/>
-                </button>
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex p-0.5 rounded-full" style={{ background:'var(--bg-1)' }} role="group" aria-label="Chart type">
+                    {[['line','Line'],['candle','Candles']].map(([k, l]) => (
+                      <button key={k} onClick={() => setChartMode(k)} aria-pressed={chartMode === k}
+                        className="text-xs px-3 py-1 rounded-full font-semibold transition-colors"
+                        style={chartMode === k ? { background:'var(--bg-0)', color:'var(--text-1)', boxShadow:'0 1px 3px rgba(var(--shadow-color),.15)' } : { color:'var(--text-2)' }}>
+                        {l}
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={refetchChart} className="p-1.5 rounded-md transition-colors hover:text-accent"
+                    style={{ color:'var(--text-3)' }} title="Refresh chart" aria-label="Refresh chart">
+                    <RefreshCw size={12} className={chartLoading ? 'animate-spin' : ''}/>
+                  </button>
+                </div>
               </div>
 
-              <AnimatePresence mode="wait">
-                {chartLoading ? (
-                  <motion.div key="loading"
-                    initial={{ opacity:0 }} animate={{ opacity:1 }} exit={{ opacity:0 }}
-                    className="space-y-2" style={{ height:340 }}>
-                    <Skeleton h="h-[290px]"/>
-                    <Skeleton h="h-[44px]"/>
-                  </motion.div>
-                ) : chartData?.length ? (
-                  <motion.div key={range}
-                    initial={{ opacity:0 }} animate={{ opacity:1 }} transition={{ duration:0.25 }}>
-                    <ResponsiveContainer width="100%" height={290}>
-                      <AreaChart data={chartData} margin={{ top:5, right:5, bottom:0, left:5 }}>
-                        <defs>
-                          <linearGradient id="stockGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%"  stopColor={strokeColor} stopOpacity={0.14}/>
-                            <stop offset="95%" stopColor={strokeColor} stopOpacity={0}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid stroke="var(--border)" strokeOpacity={0.7} vertical={false}/>
-                        <XAxis dataKey="date" tick={TICK}
-                          interval={Math.floor(chartData.length / 6)} axisLine={false} tickLine={false}/>
-                        <YAxis tick={TICK} domain={['auto','auto']} orientation="right"
-                          axisLine={false} tickLine={false} tickFormatter={v => `$${v.toFixed(0)}`} width={52}/>
-                        <Tooltip content={<ChartTooltip/>}/>
-                        {quote?.prevClose != null && (
-                          <ReferenceLine y={quote.prevClose} stroke="var(--text-3)" strokeDasharray="2 3" strokeWidth={1}/>
-                        )}
-                        <Area type="monotone" dataKey="price" stroke={strokeColor}
-                          strokeWidth={1.75} fill="url(#stockGrad)" dot={false}/>
-                      </AreaChart>
-                    </ResponsiveContainer>
-                    {chartData.some(d => d.volume) && (
-                      <ResponsiveContainer width="100%" height={44} className="mt-1">
-                        <BarChart data={chartData} margin={{ top:0, right:5, bottom:0, left:5 }}>
-                          <Bar dataKey="volume" fill="var(--border-light)" radius={[2,2,0,0]}/>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    )}
-                  </motion.div>
-                ) : (
-                  <div className="flex items-center justify-center text-center px-4" style={{ height:290 }}>
-                    <p className="text-sm" style={{ color:'var(--text-3)' }}>No chart data for this range. Try another range or refresh the chart.</p>
-                  </div>
-                )}
-              </AnimatePresence>
+              {rng && !chartLoading && (
+                <div className="text-sm font-semibold num mb-1" style={{ color: rng.up ? 'rgb(var(--up))' : 'rgb(var(--down))' }}>
+                  {rng.up ? '+' : '−'}{Math.abs(rng.change).toFixed(2)} ({rng.up ? '+' : '−'}{Math.abs(rng.changePct).toFixed(2)}%)
+                  <span className="font-normal ml-1.5" style={{ color:'var(--text-3)' }}>{RANGE_WORDS[range]}</span>
+                </div>
+              )}
 
-              <div className="flex items-center justify-between gap-3 mt-2 text-[11px]" style={{ color:'var(--text-3)' }}>
-                <span>{chartData?.some(d => d.volume) ? 'Volume shown below the price' : ''}</span>
+              {chartLoading && !chartPts.length ? (
+                <div className="rounded-lg shimmer" style={{ height:360 }}/>
+              ) : chartPts.length > 1 ? (
+                <PriceChart data={chartPts} mode={chartMode} intraday={intraday} tz={chartTz} bar={range === '5Y' ? 'week' : range === 'All' ? 'month' : null}
+                  prevClose={chartPrev} height={360} onHover={setHoverPt} ariaLabel={`${stock.symbol} ${range} chart`} />
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-3 text-center px-4" style={{ height:300 }}>
+                  <p className="text-sm" style={{ color:'var(--text-3)' }}>Price history isn’t available for this range right now.</p>
+                  <button onClick={refetchChart} className="btn-ghost text-xs">Try again</button>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-3 mt-2 text-[11px] flex-wrap" style={{ color:'var(--text-3)' }}>
+                <span>Hover for details · drag across the chart to measure a move</span>
                 {chartSource && (
                   <span className="inline-flex items-center gap-1.5">
                     {chartLive && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background:'rgb(var(--up))' }}/>}
-                    Source: {chartSource}
+                    Source: {chartSource}{chartTz ? ` · times in ${chartTz.split('/').pop().replace('_', ' ')} time` : ''}
                   </span>
                 )}
               </div>

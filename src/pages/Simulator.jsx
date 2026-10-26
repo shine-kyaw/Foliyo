@@ -12,6 +12,7 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts'
 import { persist } from '../utils/userStore'
+import PriceChart from '../components/PriceChart'
 
 /* ── Persistence keys ────────────────────────────────────────── */
 const KEY_CASH     = 'foliyo_sim_cash'
@@ -46,7 +47,7 @@ function historyPoints(history, range) {
     : { month:'short', day:'numeric' }
   return history
     .filter(p => p.t >= cutoff)
-    .map(p => ({ date: new Date(p.t).toLocaleString('en-US', fmt), value: p.value }))
+    .map(p => ({ t: p.t, close: p.value, date: new Date(p.t).toLocaleString('en-US', fmt) }))
 }
 
 /* ── AI Coach ───────────────────────────────────────────────── */
@@ -507,25 +508,8 @@ export default function Simulator() {
                   : 'No readings in this range yet. Pick a longer range.'}
               </div>
             ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <AreaChart data={chartData} margin={{ top:5, right:5, bottom:0, left:5 }}>
-                <defs>
-                  <linearGradient id="simGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor={dirC} stopOpacity={0.14}/>
-                    <stop offset="95%" stopColor={dirC} stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid stroke="var(--border)" vertical={false}/>
-                <XAxis dataKey="date" tick={{ fontSize:11, fill:'var(--text-3)' }}
-                  interval={Math.floor(chartData.length/5)} axisLine={false} tickLine={false}/>
-                <YAxis tick={{ fontSize:11, fill:'var(--text-3)' }} domain={['auto','auto']}
-                  axisLine={false} tickLine={false}
-                  tickFormatter={v => `$${(v/1000).toFixed(0)}k`} width={48}/>
-                <Tooltip content={<ChartTip/>}/>
-                <Area type="monotone" dataKey="value"
-                  stroke={dirC} strokeWidth={2} fill="url(#simGrad)"/>
-              </AreaChart>
-            </ResponsiveContainer>
+            <PriceChart data={chartData} height={280} showVolume={false} intraday
+              ariaLabel="Simulator portfolio value" />
             )}
           </section>
 

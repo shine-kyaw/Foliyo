@@ -1,10 +1,11 @@
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   ArrowLeft, Globe2, AlertTriangle, ExternalLink, RefreshCw, CheckCircle2, XCircle,
 } from 'lucide-react'
 import { ysxStocks, YSX_URL } from '../data/myanmarStocks'
 import { useYsxHistory, useYsxQuotes, withQuote } from '../hooks/useYsx'
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
+import PriceChart, { rangeChange } from '../components/PriceChart'
 
 const BOARD = '/global-markets?region=myanmar'
 
@@ -92,6 +93,12 @@ function StockView({ stock }) {
   const changeColor = hasChange ? (up ? 'rgb(var(--up))' : 'rgb(var(--down))') : 'var(--text-3)'
 
   const chartData = rows.map(r => ({ day: fmtDay(r.date), price: r.close, traded: r.traded }))
+  // Sessions close at 13:00 Yangon time (UTC+6:30)
+  const ysxPts = rows.map(r => ({
+    t: Date.parse(`${r.date}T13:00:00+06:30`), close: r.close, open: r.open, high: r.high, low: r.low, volume: r.volume,
+    note: r.traded === false ? 'No trades this session — price carried from the previous close' : null,
+  }))
+  const [ysxMode, setYsxMode] = useState('line')
   const noTradeDays = rows.filter(r => !r.traded).length
   const range30 = rows.length ? {
     high: Math.max(...rows.map(r => r.close)),
@@ -184,24 +191,19 @@ function StockView({ stock }) {
 
               {!chartLoading && !chartError && chartData.length > 0 && (
                 <>
-                  <ResponsiveContainer width="100%" height={260}>
-                    <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="mmkGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%"  stopColor={chartColor} stopOpacity={0.16} />
-                          <stop offset="95%" stopColor={chartColor} stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid stroke="var(--border)" strokeOpacity={0.7} vertical={false} />
-                      <XAxis dataKey="day" tick={{ fill: 'var(--text-3)', fontSize: 11 }} axisLine={false} tickLine={false}
-                        interval={Math.max(Math.floor(chartData.length / 5), 0)} />
-                      <YAxis tick={{ fill: 'var(--text-3)', fontSize: 11 }} axisLine={false} tickLine={false} orientation="right"
-                        tickFormatter={v => v.toLocaleString()} domain={['auto', 'auto']} width={58} />
-                      <Tooltip content={<CustomTooltip />} />
-                      <Area type="monotone" dataKey="price" stroke={chartColor} strokeWidth={1.8}
-                        fill="url(#mmkGrad)" dot={false} />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  <div className="flex justify-end mb-2">
+                    <div className="inline-flex p-0.5 rounded-full" style={{ background:'var(--bg-1)' }} role="group" aria-label="Chart type">
+                      {[['line','Line'],['candle','Candles']].map(([k, l]) => (
+                        <button key={k} onClick={() => setYsxMode(k)} aria-pressed={ysxMode === k}
+                          className="text-xs px-3 py-1 rounded-full font-semibold"
+                          style={ysxMode === k ? { background:'var(--bg-0)', color:'var(--text-1)', boxShadow:'0 1px 3px rgba(var(--shadow-color),.15)' } : { color:'var(--text-2)' }}>
+                          {l}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <PriceChart data={ysxPts} mode={ysxMode} tz="Asia/Yangon" prefix="" suffix=" MMK" decimals={0}
+                    height={320} ariaLabel={`${stock.code} 30-day chart`} />
                   <div className="mt-2 text-xs" style={{ color: 'var(--text-3)' }}>
                     Source:{' '}
                     <a href={history.sourceUrl} target="_blank" rel="noopener noreferrer"

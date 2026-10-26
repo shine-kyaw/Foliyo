@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '../services/api'
 import { generatePriceHistory } from '../data/mockData'
 
-const CLIENT_TTL = { '1D': 60_000, '5D': 120_000, '1M': 300_000, '6M': 600_000, '1Y': 600_000, '5Y': 1_800_000, 'All': 3_600_000 }
+const CLIENT_TTL = { '3M': 600_000, 'YTD': 600_000, '1D': 60_000, '5D': 120_000, '1M': 300_000, '6M': 600_000, '1Y': 600_000, '5Y': 1_800_000, 'All': 3_600_000 }
 const cache = new Map()
 
 /**
@@ -18,21 +18,22 @@ export function useChart(symbol, range = '1M', mockPrice = null) {
   const [error, setError]   = useState(null)
   const [isLive, setIsLive] = useState(false)
   const [source, setSource] = useState(null)
+  const [timezone, setTimezone] = useState(null)
 
   const load = useCallback(async () => {
     if (!symbol) return
     const cacheKey = `${symbol}:${range}`
     const cached = cache.get(cacheKey)
     if (cached && Date.now() < cached.exp) {
-      setData(cached.data); setIsLive(cached.isLive); setSource(cached.source)
+      setData(cached.data); setIsLive(cached.isLive); setSource(cached.source); setTimezone(cached.timezone || null)
       return
     }
     setLoading(true); setError(null)
     try {
       const result = await api.chart(symbol, range)
       const ttl = CLIENT_TTL[range] ?? 300_000
-      cache.set(cacheKey, { data: result.data, isLive: result.isLive, source: result.source, exp: Date.now() + ttl })
-      setData(result.data); setIsLive(result.isLive ?? false); setSource(result.source)
+      cache.set(cacheKey, { data: result.data, isLive: result.isLive, source: result.source, timezone: result.timezone, exp: Date.now() + ttl })
+      setData(result.data); setIsLive(result.isLive ?? false); setSource(result.source); setTimezone(result.timezone || null)
     } catch (err) {
       // Fallback: generate mock history from a price if provided
       const pts = { '1D': 78, '5D': 65, '1M': 22, '6M': 130, '1Y': 252, '5Y': 260, 'All': 120 }[range] ?? 30
@@ -46,5 +47,5 @@ export function useChart(symbol, range = '1M', mockPrice = null) {
 
   useEffect(() => { load() }, [load])
 
-  return { data, loading, error, isLive, source, refetch: load }
+  return { data, loading, error, isLive, source, timezone, refetch: load }
 }
